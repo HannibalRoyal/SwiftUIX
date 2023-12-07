@@ -17,7 +17,13 @@ public struct CocoaTextField<Label: View>: View {
         public let replacement: String
     }
     
+    public enum LimitType: Equatable {
+        case none
+        case bytes(count: Int)
+    }
+    
     struct _Configuration {
+        var limitType: LimitType = .bytes(count: 0)
         var onEditingChanged: (Bool) -> Void = { _ in }
         var onCommit: () -> Void
         var onDeleteBackward: () -> Void = { }
@@ -71,10 +77,12 @@ public struct CocoaTextField<Label: View>: View {
     private let keyboard = Keyboard.main
     #endif
     
+    private var limitType: LimitType = .bytes(count: 0)
     private var label: Label
     private var text: Binding<String>
     private var isEditing: Binding<Bool>
     private var configuration: _Configuration
+    
     
     public var body: some View {
         ZStack(
@@ -87,7 +95,6 @@ public struct CocoaTextField<Label: View>: View {
                 label
                     .font(configuration.uiFont.map(Font.init) ?? font)
                     .opacity(text.wrappedValue.isEmpty ? 1.0 : 0.0)
-                    .animation(nil)
             }
             
             _CocoaTextField<Label>(
@@ -157,6 +164,18 @@ fileprivate struct _CocoaTextField<Label: View>: UIViewRepresentable {
             
             return true
         }
+        
+        @objc
+        func _textFieldDidChanged(_ textField:UITextField) {
+            switch self.configuration.limitType {
+            case .none:
+                break
+            case let .bytes(count: count):
+                if count > 0 {
+                    textField.limitWithByte(count)
+                }
+            }
+        }
     }
     
     func makeUIView(context: Context) -> UIViewType {
@@ -166,6 +185,8 @@ fileprivate struct _CocoaTextField<Label: View>: UIViewRepresentable {
         uiView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
         uiView.delegate = context.coordinator
+        uiView.addTarget(context.coordinator, action: #selector(_CocoaTextField.Coordinator._textFieldDidChanged(_:)), for: .editingChanged)
+        
         
         if context.environment.isEnabled {
             DispatchQueue.main.async {
@@ -372,6 +393,20 @@ extension CocoaTextField where Label == Text {
         self.isEditing = isEditing
         self.configuration = .init(onCommit: onCommit)
     }
+    
+    public init(
+        limitType:CocoaTextField.LimitType = .none,
+        text: Binding<String>,
+        isEditing: Binding<Bool>,
+        onCommit: @escaping () -> Void = { },
+        @ViewBuilder label: () -> Text
+    ) {
+        self.label = label()
+        self.text = text
+        self.isEditing = isEditing
+        self.configuration = .init(onCommit: onCommit)
+        self.configuration.limitType = limitType
+    }
 }
 
 extension CocoaTextField {
@@ -534,6 +569,7 @@ extension CocoaTextField where Label == Text {
 // MARK: - Auxiliary
 
 private final class PlatformTextField: UITextField {
+    
     var isFirstResponderBinding: Binding<Bool>?
 
     var onDeleteBackward: () -> Void = { }
@@ -596,6 +632,38 @@ private final class PlatformTextField: UITextField {
         let original = super.clearButtonRect(forBounds: bounds)
         
         return clearButtonRect?(bounds, original) ?? original
+    }
+}
+
+extension UITextField {
+    func limitWithByte(_ maxByteCount:Int) -> Void {
+        if let text = self.text {
+            if let range = self.markedTextRange {
+                if let _ = self.position(from: range.start, offset: 0) {
+                    return
+                }
+            }
+            let textBytes = text.lengthOfBytes(using: .utf8)
+            if textBytes > maxByteCount {
+                var totleBytes:Int = 0
+                var finalStr = ""
+                for index in 0..<text.utf16.count {
+                    let char: Character = text[text.index(text.startIndex, offsetBy: index)]
+                    let str = String(char)
+                    
+                    let currentBytes = str.lengthOfBytes(using: .utf8)
+                    
+                    let temp = totleBytes + currentBytes
+                    if temp > maxByteCount {
+                        self.text = finalStr
+                        break
+                    } else {
+                        finalStr.append(str)
+                        totleBytes += currentBytes
+                    }
+                }
+            }
+        }
     }
 }
 
