@@ -8,7 +8,6 @@ import Combine
 import Swift
 import SwiftUI
 
-@_spi(Internal)
 public enum _SwiftUIX_TextEditorEvent: Hashable {
     case insert(text: NSAttributedString, range: NSRange?)
     case delete(text: NSAttributedString, range: NSRange)
@@ -48,13 +47,16 @@ public struct _TextViewReader<Content: View>: View {
 }
 
 public final class _TextEditorProxy: Equatable, ObservableObject {
-    private let _base = WeakReferenceBox<AppKitOrUIKitTextView>(nil)
-    private var _fakeTextCursor = _TextCursorTracking(owner: nil)
+    public typealias _Base = any _SwiftUIX_AnyIndirectValueBox<AppKitOrUIKitTextView?>
+    
+    let _base = WeakReferenceBox<AppKitOrUIKitTextView>(nil)
+    
+    private var _fakeTextCursor = _ObservableTextCursor(owner: nil)
     
     @_spi(Internal)
-    public var base: (any _PlatformTextView_Type)? {
+    public var base: (any _PlatformTextViewType)? {
         get {
-            _base.wrappedValue.map({ $0 as! any _PlatformTextView_Type })
+            _base.wrappedValue.map({ $0 as! any _PlatformTextViewType })
         } set {
             objectWillChange.send()
             
@@ -62,11 +64,14 @@ public final class _TextEditorProxy: Equatable, ObservableObject {
         }
     }
     
-    public var textCursor: _TextCursorTracking {
-        base?._trackedTextCursor ?? _fakeTextCursor
+    public var isFocused: Bool {
+        base?._SwiftUIX_isFirstResponder ?? false
+    }
+
+    public var textCursor: _ObservableTextCursor {
+        base?._observableTextCursor ?? _fakeTextCursor
     }
     
-    @_spi(Internal)
     public var _textEditorEventsPublisher: AnyPublisher<_SwiftUIX_TextEditorEvent, Never>? {
         base?._textEditorEventPublisher
     }

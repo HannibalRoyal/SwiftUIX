@@ -9,7 +9,7 @@ import SwiftUI
 public struct LazyView<Body: View>: View {
     @Environment(\._lazyViewResolver) private var _lazyViewResolver
     
-    private let destination: () -> Body
+    public let destination: () -> Body
     
     @_optimize(none)
     @inline(never)
@@ -48,25 +48,42 @@ public struct LazyAppearViewProxy {
     }
 }
 
-@_spi(Internal)
 @frozen
-public struct _LazyAppearView<Content: View>: View {
+public struct _DeferredView<Content: View>: View {
     @usableFromInline
     let content: () -> Content
     
     @usableFromInline
     @State var didAppear: Bool = false
+    @usableFromInline
+    @State var didAppear2: Bool = false
 
-    public init(content: @escaping () -> Content) {
+    public init(@ViewBuilder content: @escaping () -> Content) {
         self.content = content
     }
-        
+    
     public var body: some View {
-        if didAppear {
-            content()
-        } else {
-            ZeroSizeView().onAppear {
-                didAppear = true
+        Group {
+            if didAppear2 {
+                content()
+            } else if didAppear {
+                ZeroSizeView().onAppear {
+                    if !didAppear2 {
+                        didAppear2 = true
+                    }
+                }
+            } else {
+                ZeroSizeView()
+                    .onAppear {
+                        if !didAppear {
+                            didAppear = true
+                        }
+                    }
+            }
+        }
+        .transaction { transaction in
+            if !(didAppear && didAppear2) {
+                transaction.disablesAnimations = true
             }
         }
     }

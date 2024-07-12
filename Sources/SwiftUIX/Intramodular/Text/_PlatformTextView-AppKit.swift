@@ -23,7 +23,7 @@ extension _PlatformTextView {
         
         view._update(data: data, configuration: configuration, context: context)
     }
-    
+        
     private func _update(
         data: _TextViewDataBinding,
         configuration: TextView<Label>._Configuration,
@@ -35,7 +35,8 @@ extension _PlatformTextView {
         _assignIfNotEqual(!configuration.isConstant && configuration.isEditable, to: \.isEditable)
         _assignIfNotEqual(.zero, to: \.textContainerInset)
         _assignIfNotEqual(true, to: \.usesAdaptiveColorMappingForDarkAppearance)
-        
+        _assignIfNotEqual(configuration.isSelectable, to: \.isSelectable)
+
         if let font = try? configuration.cocoaFont ?? context.environment.font?.toAppKitOrUIKitFont() {
             _assignIfNotEqual(font, to: \.self.font)
             
@@ -93,10 +94,15 @@ extension _PlatformTextView {
 @available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
 extension _PlatformTextView {
     private func _invalidateIntrinsicContentSizeAndEnsureLayoutIfNeeded() {
-        guard let textContainer = textContainer else {
-            return
+        defer {
+            _needsIntrinsicContentSizeInvalidation = false
+            _wantsRelayout = false
         }
         
+        guard let textContainer = textContainer, !_SwiftUIX_intrinsicContentSizeIsDisabled else {
+            return
+        }
+                        
         if _needsIntrinsicContentSizeInvalidation {
             invalidateIntrinsicContentSize()
             
@@ -115,9 +121,6 @@ extension _PlatformTextView {
                 _SwiftUIX_layoutIfNeeded()
             }
         }
-        
-        _needsIntrinsicContentSizeInvalidation = false
-        _wantsRelayout = false
     }
     
     private func _computeIntrinsicContentSize() -> CGSize? {
@@ -128,7 +131,7 @@ extension _PlatformTextView {
                 case (false, true):
                     return nil
                 default:
-                    assertionFailure()
+                    assertionFailure("\(_fixedSize) is currently unsupported.")
                     
                     break
             }
@@ -138,6 +141,7 @@ extension _PlatformTextView {
             return nil
         }
         
+        let oldIntrinsicContentSize: CGSize? = self.intrinsicContentSize
         let proposal = AppKitOrUIKitLayoutSizeProposal(width: frame.size.width, height: nil)
         let intrinsicContentSize: CGSize?
         
@@ -145,6 +149,12 @@ extension _PlatformTextView {
             intrinsicContentSize = cached.toAppKitOrUIKitIntrinsicContentSize()
         } else {
             intrinsicContentSize = _sizeThatFits(proposal: proposal)?.toAppKitOrUIKitIntrinsicContentSize()
+            
+            if let oldIntrinsicContentSize, let intrinsicContentSize {
+                if intrinsicContentSize.width == oldIntrinsicContentSize.width || intrinsicContentSize.width == frame.width {
+                    representableCache._sizeThatFitsCache[.init(width: self.frame.width, height: nil)] = intrinsicContentSize
+                }
+            }
         }
         
         guard let intrinsicContentSize else {
@@ -194,6 +204,10 @@ extension _PlatformTextView {
 
 extension NSTextView {
     func setLineSpacing(_ lineSpacing: CGFloat) {
+        if defaultParagraphStyle == nil && lineSpacing == 0 {
+            return
+        }
+        
         if defaultParagraphStyle?.lineSpacing == lineSpacing {
             return
         }

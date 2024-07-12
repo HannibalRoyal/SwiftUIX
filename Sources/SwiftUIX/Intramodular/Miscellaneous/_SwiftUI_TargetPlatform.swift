@@ -4,6 +4,54 @@
 
 import SwiftUI
 
+public enum _IfAvailable {
+    public enum Available {
+        case available
+    }
+    
+    case `if`(Available)
+}
+
+public enum _SwiftUI_TargetPlatformType {
+    case iOS
+    case macOS
+    case tvOS
+    case visionOS
+    case watchOS
+}
+
+#if os(iOS)
+extension _SwiftUI_TargetPlatformType {
+    public static var current: Self {
+        Self.iOS
+    }
+}
+#elseif os(macOS)
+extension _SwiftUI_TargetPlatformType {
+    public static var current: Self {
+        Self.macOS
+    }
+}
+#elseif os(tvOS)
+extension _SwiftUI_TargetPlatformType {
+    public static var current: Self {
+        Self.tvOS
+    }
+}
+#elseif os(visionOS)
+extension _SwiftUI_TargetPlatformType {
+    public static var current: Self {
+        Self.visionOS
+    }
+}
+#elseif os(watchOS)
+extension _SwiftUI_TargetPlatformType {
+    public static var current: Self {
+        Self.watchOS
+    }
+}
+#endif
+
 public enum _SwiftUI_TargetPlatform {
     public enum iOS {
         case iOS
@@ -268,6 +316,26 @@ extension EnvironmentValues {
         } set {
             // no op
         }
+    }
+}
+#endif
+
+#if swift(>=5.9)
+extension View {
+    @ViewBuilder
+    public func _geometryGroup(_: _IfAvailable) -> some View {
+        if #available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *) {
+            geometryGroup()
+        } else {
+            self
+        }
+    }
+}
+#else
+extension View {
+    @ViewBuilder
+    public func _geometryGroup(_: _IfAvailable) -> some View {
+        self
     }
 }
 #endif

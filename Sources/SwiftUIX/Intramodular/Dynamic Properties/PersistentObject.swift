@@ -9,59 +9,134 @@ import SwiftUI
 /// A property wrapper type that instantiates an observable object.
 @propertyWrapper
 public struct PersistentObject<Value>: DynamicProperty {
-    private let thunk: () -> Value
+    private let thunk: () -> AnyObject?
     
-    @State private var objectContainer: _ObservableObjectBox<Value>
-    
-    @ObservedObject private var observedObjectContainer: _ObservableObjectBox<Value>
+    @State private var objectContainer: _AnyObservableObjectMutableBox<Value>
+    @State private var foo: Bool = false
+
+    @ObservedObject package var observedObjectContainer: _AnyObservableObjectMutableBox<Value>
     
     public var wrappedValue: Value {
         get {
-            if let object = objectContainer.base {
-                observedObjectContainer.base = object
+            _ = foo
+            
+            if let object = objectContainer.__unsafe_opaque_base {
+                observedObjectContainer.__unsafe_opaque_base = object
                 
-                return object
+                return objectContainer.wrappedValue
             } else {
                 let object = thunk()
                 
-                objectContainer.base = object
-                observedObjectContainer.base = object
+                objectContainer.__unsafe_opaque_base = object
+                observedObjectContainer.__unsafe_opaque_base = object
                 
-                return object
+                return objectContainer.wrappedValue
             }
         } nonmutating set {
+            _ = foo
+            
             observedObjectContainer.objectWillChange.send()
-
-            objectContainer.base = newValue
-            observedObjectContainer.base = newValue
+            
+            objectContainer.wrappedValue = newValue
+            observedObjectContainer.wrappedValue = newValue
         }
     }
     
+    public var projectedValue: Wrapper {
+        PersistentObject.Wrapper(base: self)
+    }
+
     public init(
         wrappedValue thunk: @autoclosure @escaping () -> Value
     ) where Value: ObservableObject {
         self.thunk = thunk
-        self._objectContainer = .init(initialValue: .init(base: nil))
-        self._observedObjectContainer = .init(initialValue: .init(base: nil))
+        self._objectContainer = State(initialValue: _ObservableObjectMutableBox(makeBase: thunk))
+        self._observedObjectContainer = ObservedObject(initialValue: _ObservableObjectMutableBox(makeBase: thunk))
     }
     
     public init<T: ObservableObject>(
         wrappedValue thunk: @autoclosure @escaping () -> Value
     ) where Value == Optional<T> {
-        self.thunk = thunk
-        self._objectContainer = .init(initialValue: .init(base: nil))
-        self._observedObjectContainer = .init(initialValue: .init(base: nil))
+        self.thunk = { thunk() }
+        self._objectContainer = State(initialValue: _ObservableObjectMutableBox(base: nil))
+        self._observedObjectContainer = ObservedObject(initialValue: _ObservableObjectMutableBox(base: nil))
     }
     
+    public init<T: ObservableObject & _SwiftUIX_MutablePropertyWrapperObject>(
+        unwrapping thunk: @autoclosure @escaping () -> T
+    ) where Value == T._SwiftUIX_WrappedValueType {
+        self.thunk = { thunk() }
+        
+        let makeBox: (() -> _AnyObservableObjectMutableBox<T._SwiftUIX_WrappedValueType>) = {
+            _ObservableObjectMutableBox<T, T._SwiftUIX_WrappedValueType>(
+                base: nil,
+                wrappedValue: { (propertyWrapper: inout T?) in
+                    let _propertyWrapper: T
+                    
+                    if let propertyWrapper {
+                        _propertyWrapper = propertyWrapper
+                    } else {
+                        _propertyWrapper = thunk()
+                    }
+                    
+                    return Binding<Value>(
+                        get: { [unowned _propertyWrapper] in
+                            _propertyWrapper.wrappedValue
+                        },
+                        set: { [unowned _propertyWrapper] newValue in
+                            _propertyWrapper.wrappedValue = newValue
+                        }
+                    )
+                }
+            )
+        }
+        self._objectContainer = State(initialValue: makeBox())
+        self._observedObjectContainer = ObservedObject(initialValue: makeBox())
+    }
+    
+    public init<T: ObservableObject & _SwiftUIX_MutablePropertyWrapperObject>(
+        unwrapping thunk: @escaping () -> T
+    ) where Value == T._SwiftUIX_WrappedValueType {
+        self.init(unwrapping: thunk())
+    }
     
     public mutating func update() {
         _objectContainer.update()
         _observedObjectContainer.update()
     }
+    
+    public func _toggleFoo() {
+        foo.toggle()
+    }
 }
 
-extension PersistentObject where Value: ObservableObject {
-    public var projectedValue: ObservedObject<Value>.Wrapper {
-        ObservedObject(wrappedValue: wrappedValue).projectedValue
+extension PersistentObject {
+    @dynamicMemberLookup
+    public struct Wrapper {
+        public let base: PersistentObject
+        
+        public var binding: Binding<Value> {
+            Binding<Value>(
+                get: {
+                    base.wrappedValue
+                },
+                set: { newValue in
+                    base.wrappedValue = newValue
+                }
+            )
+        }
+        
+        public subscript<T>(
+            dynamicMember keyPath: ReferenceWritableKeyPath<Value, T>
+        ) -> Binding<T> {
+            Binding<T>(
+                get: {
+                    base.wrappedValue[keyPath: keyPath]
+                },
+                set: { newValue in
+                    base.wrappedValue[keyPath: keyPath] = newValue
+                }
+            )
+        }
     }
 }

@@ -7,8 +7,20 @@ import Foundation
 import Swift
 
 extension DispatchQueue {
-    @usableFromInline
-    static func asyncOnMainIfNecessary(execute work: @escaping () -> ()) {
+    @_spi(Internal)
+    @_transparent
+    public static func asyncOnMainIfNecessary(
+        _ necessary: Bool? = nil,
+        execute work: @escaping () -> ()
+    ) {
+        if let necessary {
+            guard necessary == false else {
+                DispatchQueue.main.async(execute: work)
+                
+                return
+            }
+        }
+        
         if Thread.isMainThread {
             work()
         } else {

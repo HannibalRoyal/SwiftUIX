@@ -5,7 +5,7 @@
 import Swift
 import SwiftUI
 
-#if (os(iOS) && canImport(CoreTelephony)) || os(macOS) || targetEnvironment(macCatalyst)
+#if os(iOS) || os(macOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
 /// A specialized view for receiving search-related information from the user.
 public struct SearchBar: DefaultTextInputType {
@@ -14,14 +14,7 @@ public struct SearchBar: DefaultTextInputType {
     fileprivate var searchTokens: Binding<[SearchToken]>?
     
     var customAppKitOrUIKitClass: AppKitOrUIKitSearchBar.Type?
-    
-    #if os(iOS) || targetEnvironment(macCatalyst)
-    @available(macCatalystApplicationExtension, unavailable)
-    @available(iOSApplicationExtension, unavailable)
-    @available(tvOSApplicationExtension, unavailable)
-    @ObservedObject private var keyboard = Keyboard.main
-    #endif
-    
+        
     private let onEditingChanged: (Bool) -> Void
     private let onCommit: () -> Void
     private var isInitialFirstResponder: Bool?
@@ -31,7 +24,7 @@ public struct SearchBar: DefaultTextInputType {
     
     private var appKitOrUIKitFont: AppKitOrUIKitFont?
     private var appKitOrUIKitForegroundColor: AppKitOrUIKitColor?
-    #if os(iOS) || targetEnvironment(macCatalyst)
+    #if os(iOS) || os(visionOS) || targetEnvironment(macCatalyst)
     private var appKitOrUIKitSearchFieldBackgroundColor: UIColor?
     private var searchBarStyle: UISearchBar.Style = .minimal
     private var iconImageConfiguration: [UISearchBar.Icon: AppKitOrUIKitImage] = [:]
@@ -40,7 +33,7 @@ public struct SearchBar: DefaultTextInputType {
     private var showsCancelButton: Bool?
     private var onCancel: () -> Void = { }
     
-    #if os(iOS) || targetEnvironment(macCatalyst)
+    #if os(iOS) || os(visionOS) || targetEnvironment(macCatalyst)
     private var returnKeyType: UIReturnKeyType?
     private var enablesReturnKeyAutomatically: Bool?
     private var isSecureTextEntry: Bool = false
@@ -95,7 +88,7 @@ public struct SearchBar: DefaultTextInputType {
     }
 }
 
-#if os(iOS) || targetEnvironment(macCatalyst)
+#if os(iOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
 @available(macCatalystApplicationExtension, unavailable)
 @available(iOSApplicationExtension, unavailable)
@@ -135,20 +128,15 @@ extension SearchBar: UIViewRepresentable {
         style: do {
             uiView.searchTextField.autocorrectionType = environment.disableAutocorrection.map({ $0 ? .no : .yes }) ?? .default
             
-            if (appKitOrUIKitFont != nil || environment.font != nil) || appKitOrUIKitForegroundColor != nil || appKitOrUIKitSearchFieldBackgroundColor != nil {
+            if (appKitOrUIKitFont != nil || environment.font != nil) {
                 if let font = try? appKitOrUIKitFont ?? environment.font?.toAppKitOrUIKitFont() {
                     uiView.searchTextField.font = font
                 }
-                
-                if let foregroundColor = appKitOrUIKitForegroundColor {
-                    uiView.searchTextField.textColor = foregroundColor
-                }
-                
-                if let backgroundColor = appKitOrUIKitSearchFieldBackgroundColor {
-                    uiView.searchTextField.backgroundColor = backgroundColor
-                }
             }
-            
+
+            uiView.searchTextField.backgroundColor = appKitOrUIKitSearchFieldBackgroundColor
+            uiView.searchTextField.textColor = appKitOrUIKitForegroundColor
+
             if let placeholder = placeholder {
                 uiView.placeholder = placeholder
             }
@@ -306,6 +294,7 @@ extension SearchBar: NSViewRepresentable {
 
         nsView.isFirstResponderBinding = isFocused
 
+        _assignIfNotEqual(NSControl.ControlSize(context.environment.controlSize), to: &nsView.controlSize)
         _assignIfNotEqual(.roundedBezel, to: &nsView.bezelStyle)
         _assignIfNotEqual(focusRingType, to: &nsView.focusRingType)
         _assignIfNotEqual(false, to: &nsView.isBordered)
@@ -415,23 +404,23 @@ extension SearchBar {
         self.font(AppKitOrUIKitFont(name: font.rawValue, size: size))
     }
 
-    public func foregroundColor(_ foregroundColor: AppKitOrUIKitColor) -> Self {
+    public func foregroundColor(_ foregroundColor: AppKitOrUIKitColor?) -> Self {
         then({ $0.appKitOrUIKitForegroundColor = foregroundColor })
     }
     
     #if os(iOS) || targetEnvironment(macCatalyst)
     @_disfavoredOverload
-    public func foregroundColor(_ foregroundColor: Color) -> Self {
-        then({ $0.appKitOrUIKitForegroundColor = foregroundColor.toUIColor() })
+    public func foregroundColor(_ foregroundColor: Color?) -> Self {
+        then({ $0.appKitOrUIKitForegroundColor = foregroundColor?.toUIColor() })
     }
     
-    public func textFieldBackgroundColor(_ backgroundColor: UIColor) -> Self {
+    public func textFieldBackgroundColor(_ backgroundColor: UIColor?) -> Self {
         then({ $0.appKitOrUIKitSearchFieldBackgroundColor = backgroundColor })
     }
     
     @_disfavoredOverload
-    public func textFieldBackgroundColor(_ backgroundColor: Color) -> Self {
-        then({ $0.appKitOrUIKitSearchFieldBackgroundColor = backgroundColor.toUIColor() })
+    public func textFieldBackgroundColor(_ backgroundColor: Color?) -> Self {
+        then({ $0.appKitOrUIKitSearchFieldBackgroundColor = backgroundColor?.toUIColor() })
     }
     
     public func searchBarStyle(_ searchBarStyle: UISearchBar.Style) -> Self {
@@ -484,7 +473,7 @@ extension SearchBar {
 
 // MARK: - Auxiliary
 
-#if os(iOS) || targetEnvironment(macCatalyst)
+#if os(iOS) || os(visionOS) || targetEnvironment(macCatalyst)
 private final class _UISearchBar: UISearchBar {
     var isFirstResponderBinding: Binding<Bool>?
         
@@ -516,18 +505,4 @@ private final class _UISearchBar: UISearchBar {
 }
 #endif
 
-#endif
-
-// MARK: - Development Preview -
-
-#if (os(iOS) && canImport(CoreTelephony)) || targetEnvironment(macCatalyst)
-@available(macCatalystApplicationExtension, unavailable)
-@available(iOSApplicationExtension, unavailable)
-@available(tvOSApplicationExtension, unavailable)
-struct SearchBar_Previews: PreviewProvider {
-    static var previews: some View {
-        SearchBar("Search...", text: .constant(""))
-            .searchBarStyle(.minimal)
-    }
-}
 #endif

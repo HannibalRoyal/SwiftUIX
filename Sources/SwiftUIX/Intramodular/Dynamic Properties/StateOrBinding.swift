@@ -54,4 +54,36 @@ public struct StateOrBinding<Value>: DynamicProperty {
     public init(_ binding: Binding<Value>) {
         self.storage = .binding(binding)
     }
+    
+    @inlinable
+    public init(_ binding: Binding<Value>?, initialValue: Value) {
+        if let binding {
+            self.storage = .binding(binding)
+        } else {
+            self.storage = .state(.init(initialValue: initialValue))
+        }
+    }
+    
+    @inlinable
+    public init<T>(_ binding: Binding<T?>?) where Value == Optional<T> {
+        if let binding {
+            self.storage = .binding(binding)
+        } else {
+            self.storage = .state(.init(initialValue: Value.init(nilLiteral: ())))
+        }
+    }
+}
+
+// MARK: - Conformances
+
+extension StateOrBinding: Equatable where Value: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.wrappedValue == rhs.wrappedValue
+    }
+}
+
+extension StateOrBinding: Hashable where Value: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        wrappedValue.hash(into: &hasher)
+    }
 }

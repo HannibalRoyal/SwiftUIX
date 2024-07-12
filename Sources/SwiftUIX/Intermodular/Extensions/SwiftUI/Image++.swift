@@ -25,6 +25,14 @@ extension Image {
         #endif
     }
     
+    public init?(image: AppKitOrUIKitImage?) {
+        guard let image else {
+            return nil
+        }
+        
+        self.init(image: image)
+    }
+    
     public init(cgImage: CGImage) {
         #if os(macOS)
         self.init(nsImage: NSImage(cgImage: cgImage, size: .zero))
@@ -54,13 +62,11 @@ extension Image {
 }
 
 extension Image {
-    public func resizable(_ resizable: Bool) -> some View {
-        PassthroughView {
-            if resizable {
-                self.resizable()
-            } else {
-                self
-            }
+    public func resizable(_ resizable: Bool?) -> Image {
+        if let resizable, resizable {
+            self.resizable()
+        } else {
+            self
         }
     }
     

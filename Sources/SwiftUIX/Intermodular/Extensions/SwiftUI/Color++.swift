@@ -385,7 +385,10 @@ extension Color {
     /// - Parameter hexadecimal: A hexadecimal representation of the color.
     ///
     /// - Returns: A `Color` from the given color code. Returns `nil` if the code is invalid.
-    public init!(hexadecimal string: String) {
+    public init!(
+        _ colorSpace: Color.RGBColorSpace = .sRGB,
+        hexadecimal string: String
+    ) {
         var string: String = string.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         
         if string.hasPrefix("#") {
@@ -413,7 +416,7 @@ extension Color {
             
             let gray = Double(g) / 255.0
             
-            self.init(.sRGB, red: gray, green: gray, blue: gray, opacity: 1)
+            self.init(colorSpace, red: gray, green: gray, blue: gray, opacity: 1)
         } else if string.count == 4 {
             let mask = 0x00FF
             
@@ -423,7 +426,7 @@ extension Color {
             let gray = Double(g) / 255.0
             let alpha = Double(a) / 255.0
             
-            self.init(.sRGB, red: gray, green: gray, blue: gray, opacity: alpha)
+            self.init(colorSpace, red: gray, green: gray, blue: gray, opacity: alpha)
         } else if string.count == 6 {
             let mask = 0x0000FF
             
@@ -435,7 +438,7 @@ extension Color {
             let green = Double(g) / 255.0
             let blue = Double(b) / 255.0
             
-            self.init(.sRGB, red: red, green: green, blue: blue, opacity: 1)
+            self.init(colorSpace, red: red, green: green, blue: blue, opacity: 1)
         } else if string.count == 8 {
             let mask = 0x000000FF
             
@@ -449,7 +452,7 @@ extension Color {
             let blue = Double(b) / 255.0
             let alpha = Double(a) / 255.0
             
-            self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
+            self.init(colorSpace, red: red, green: green, blue: blue, opacity: alpha)
         } else {
             return nil
         }
@@ -557,6 +560,59 @@ extension Color {
 #endif
 
 // MARK: - Helpers
+
+@available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
+extension AttributedString {
+    public struct _SwiftUIX_Color: Codable, Hashable, Sendable {
+        public let red: Double
+        public let green: Double
+        public let blue: Double
+        public let alpha: Double
+        
+        public init(red: Double, green: Double, blue: Double, alpha: Double) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+            self.alpha = alpha
+        }
+    }
+}
+
+@available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
+extension AttributedString._SwiftUIX_Color {
+    public init?(
+        _SwiftUIX_hexadecimal hex: String
+    ) {
+        var hex = hex
+        
+        if hex.hasPrefix("#") {
+            hex.removeFirst()
+        }
+        
+        guard let int = UInt64(hex, radix: 16) else {
+            return nil
+        }
+        
+        let r, g, b, a: UInt64
+        
+        switch hex.count {
+            case 6:
+                (r, g, b) = (int >> 16 & 0xff, int >> 8 & 0xff, int & 0xff)
+                a = 255
+            case 8:
+                (r, g, b, a) = (int >> 24 & 0xff, int >> 16 & 0xff, int >> 8 & 0xff, int & 0xff)
+            default:
+                return nil
+        }
+        
+        self.init(
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            alpha: Double(a) / 255
+        )
+    }
+}
 
 #if os(macOS)
 extension NSAppearance {

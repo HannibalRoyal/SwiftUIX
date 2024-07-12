@@ -29,7 +29,7 @@ struct WindowOverlay<Content: View>: AppKitOrUIKitViewControllerRepresentable {
     func makeAppKitOrUIKitViewController(
         context: Context
     ) -> AppKitOrUIKitViewControllerType {
-        .init(
+        AppKitOrUIKitViewControllerType(
             content: content,
             canBecomeKey: canBecomeKey,
             isVisible: isVisible.wrappedValue
@@ -69,7 +69,7 @@ extension WindowOverlay {
         var windowPresentationController: _WindowPresentationController<Content>
         
         init(content: Content, canBecomeKey: Bool, isVisible: Bool) {
-            self.windowPresentationController = .init(
+            self.windowPresentationController = _WindowPresentationController(
                 content: content,
                 canBecomeKey: canBecomeKey,
                 isVisible: isVisible
@@ -136,75 +136,6 @@ extension View {
                 isVisible: isKeyAndVisible
             )
         )
-    }
-}
-
-// MARK: - Auxiliary
-
-@available(macCatalystApplicationExtension, unavailable)
-@available(iOSApplicationExtension, unavailable)
-@available(tvOSApplicationExtension, unavailable)
-public struct WindowProxy {
-    weak var window: AppKitOrUIKitHostingWindowProtocol?
-    
-    public func orderFrontRegardless() {
-        guard let window = window else {
-            return assertionFailure()
-        }
-        
-        #if os(macOS)
-        window.orderFrontRegardless()
-        #endif
-    }
-    
-    public func _macOS_setMaximumLevel() {
-        guard let window = window else {
-            return assertionFailure()
-        }
-        
-        #if os(iOS) || os(tvOS)
-        assertionFailure()
-        #elseif os(macOS)
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.level = .screenSaver
-        #endif
-    }
-}
-
-@available(macCatalystApplicationExtension, unavailable)
-@available(iOSApplicationExtension, unavailable)
-@available(tvOSApplicationExtension, unavailable)
-public struct WindowReader<Content: View>: View {
-    @Environment(\._windowProxy) var _windowProxy: WindowProxy
-    
-    let content: (WindowProxy) -> Content
-    
-    public init(@ViewBuilder content: @escaping (WindowProxy) -> Content) {
-        self.content = content
-    }
-    
-    public var body: some View {
-        content(_windowProxy)
-    }
-}
-
-extension EnvironmentValues {
-    @available(macCatalystApplicationExtension, unavailable)
-    @available(iOSApplicationExtension, unavailable)
-    @available(tvOSApplicationExtension, unavailable)
-    struct _WindowProxyKey: EnvironmentKey {
-        static let defaultValue: WindowProxy = .init(window: nil)
-    }
-    
-    @available(macCatalystApplicationExtension, unavailable)
-    @available(iOSApplicationExtension, unavailable)
-    @available(tvOSApplicationExtension, unavailable)
-    var _windowProxy: WindowProxy {
-        get {
-            self[_WindowProxyKey.self]
-        } set {
-            self[_WindowProxyKey.self] = newValue
-        }
     }
 }
 

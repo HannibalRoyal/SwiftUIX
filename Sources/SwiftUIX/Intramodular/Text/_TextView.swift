@@ -18,12 +18,34 @@ import UIKit
 @available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
 struct _TextView<Label: View> {
     typealias Configuration = TextView<Label>._Configuration
-    
+
+    @Environment(\._textViewConfigurationMutation) private var _textViewConfigurationMutation
+        
     @ObservedObject var updater: EmptyObservableObject
     
     let data: _TextViewDataBinding
-    let configuration: Configuration
+    let _configuration: Configuration
     let customAppKitOrUIKitClassConfiguration: TextView<Label>._CustomAppKitOrUIKitClassConfiguration
+    
+    var configuration: Configuration {
+        var result = _configuration
+        
+        _textViewConfigurationMutation(&result)
+        
+        return result
+    }
+    
+    init(
+        updater: EmptyObservableObject,
+        data: _TextViewDataBinding,
+        configuration: Configuration,
+        customAppKitOrUIKitClassConfiguration: TextView<Label>._CustomAppKitOrUIKitClassConfiguration
+    ) {
+        self.updater = updater
+        self.data = data
+        self._configuration = configuration
+        self.customAppKitOrUIKitClassConfiguration = customAppKitOrUIKitClassConfiguration
+    }
 }
 
 @available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
@@ -106,7 +128,7 @@ extension _TextView: AppKitOrUIKitViewRepresentable {
 
         customAppKitOrUIKitClassConfiguration.update(view, context)
 
-        _withoutAppKitOrUIKitAnimation(context.transaction.animation == nil) {
+        _withoutAppKitOrUIKitAnimation(context.transaction.disablesAnimations) {
             if let view = view as? _PlatformTextView<Label> {
                 assert(view.representatableStateFlags.contains(.updateInProgress))
                 
@@ -128,14 +150,31 @@ extension _TextView: AppKitOrUIKitViewRepresentable {
         }
     }
     
+    static func dismantleAppKitOrUIKitView(
+        _ view: AppKitOrUIKitViewType,
+        coordinator: Coordinator
+    ) {
+        guard let view = (view as? (any _PlatformTextViewType)) else {
+            return
+        }
+
+        if #available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *) {
+            view._textEditorProxyBase?.wrappedValue = nil
+        }
+    }
+    
     private func donateProxy(
         _ view: AppKitOrUIKitViewType,
         context: Context
     ) {
         if let proxyBinding = context.environment._textViewProxy, let view = view as? _PlatformTextView<Label> {
             if let existing = proxyBinding.wrappedValue.base {
-                assert(existing === view)
-            } else {
+                if existing.representatableStateFlags.contains(.dismantled) {
+                    proxyBinding.wrappedValue._base.wrappedValue = nil
+                }
+            }
+            
+            if proxyBinding.wrappedValue.base !== view {
                 proxyBinding.wrappedValue.base = view
             }
         }
@@ -309,6 +348,10 @@ extension _TextView {
             return nil // TODO: Implement sizing for custom text views as well
         }
         
+        guard !view.representatableStateFlags.contains(.dismantled) else {
+            return nil
+        }
+
         guard let size = view._sizeThatFits(
             proposal: AppKitOrUIKitLayoutSizeProposal(
                 proposal,
@@ -419,11 +462,5 @@ extension View {
     }
 }
 #endif
-
-extension NSTextStorage {
-    public var _SwiftUIX_attributedString: NSAttributedString {
-        self
-    }
-}
 
 #endif

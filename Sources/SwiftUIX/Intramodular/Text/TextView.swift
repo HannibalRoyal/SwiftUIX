@@ -56,6 +56,7 @@ public struct TextView<Label: View>: View {
                 )
             }
         }
+        ._geometryGroup(.if(.available))
     }
 }
 
@@ -322,7 +323,7 @@ extension TextView {
             do {
                 $0.configuration.cocoaFont = try font.toAppKitOrUIKitFont()
             } catch {
-                // print(error)
+                debugPrint(error)
             }
         }
     }

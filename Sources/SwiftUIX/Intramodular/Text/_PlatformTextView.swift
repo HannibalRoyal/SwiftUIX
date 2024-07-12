@@ -9,18 +9,21 @@ import Swift
 import SwiftUI
 
 @_spi(Internal)
-public protocol _PlatformTextView_Type: _AppKitOrUIKitRepresented, AppKitOrUIKitTextView {
+public protocol _PlatformTextViewType: _AppKitOrUIKitRepresented, AppKitOrUIKitTextView {
     associatedtype Label: View
     
+    var _SwiftUIX_textViewConfiguration: _TextViewConfiguration { get }
+    
+    var _textEditorProxyBase: _TextEditorProxy._Base? { get }
     var _wantsTextKit1: Bool? { get }
     var _customTextStorage: NSTextStorage?  { get }
-    var _lastInsertedString: String?  { get }
+    var _lastInsertedString: NSAttributedString?  { get }
     var _wantsRelayout: Bool  { get }
     var _isTextLayoutInProgress: Bool? { get }
     var _needsIntrinsicContentSizeInvalidation: Bool { get set }
     
     var _textEditorEventPublisher: AnyPublisher<_SwiftUIX_TextEditorEvent, Never> { get }
-    var _trackedTextCursor: _TextCursorTracking { get }
+    var _observableTextCursor: _ObservableTextCursor { get }
     
     func _SwiftUIX_makeLayoutManager() -> NSLayoutManager?
 
@@ -49,12 +52,19 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     public internal(set) var data: _TextViewDataBinding = .string(.constant(""))
     @_spi(Internal)
     public internal(set) var configuration = TextView<Label>._Configuration()
+    
+    public var _SwiftUIX_textViewConfiguration: _TextViewConfiguration {
+        configuration
+    }
+    
     @_spi(Internal)
     public internal(set) var customAppKitOrUIKitClassConfiguration: TextView<Label>._CustomAppKitOrUIKitClassConfiguration!
     
+    public var _textEditorProxyBase: _TextEditorProxy._Base?
+    
     public internal(set) var _wantsTextKit1: Bool?
     public internal(set) var _customTextStorage: NSTextStorage?
-    public internal(set) var _lastInsertedString: String?
+    public internal(set) var _lastInsertedString: NSAttributedString?
     public internal(set) var _wantsRelayout: Bool = false
     public internal(set) var _isTextLayoutInProgress: Bool? = nil
     
@@ -62,8 +72,9 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     
     private var _lazyTextEditorEventSubject: PassthroughSubject<_SwiftUIX_TextEditorEvent, Never>? = nil
     private var _lazyTextEditorEventPublisher: AnyPublisher<_SwiftUIX_TextEditorEvent, Never>? = nil
-    private var _lazyTrackedTextCursor: _TextCursorTracking? = nil
-
+    
+    private var _lazy_observableTextCursor: _ObservableTextCursor? = nil
+    
     @_spi(Internal)
     public var _textEditorEventPublisher: AnyPublisher<_SwiftUIX_TextEditorEvent, Never> {
         guard let publisher = _lazyTextEditorEventPublisher else {
@@ -79,15 +90,35 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         return publisher
     }
     
-    public var _trackedTextCursor: _TextCursorTracking {
-        guard let result = _lazyTrackedTextCursor else {
-            let result = _TextCursorTracking(owner: self)
+    public var _observableTextCursor: _ObservableTextCursor {
+        guard let result = _lazy_observableTextCursor else {
+            let result = _ObservableTextCursor(owner: self)
+            
+            self._lazy_observableTextCursor = result
             
             return result
         }
         
         return result
     }
+    
+    #if os(macOS)
+    override open var needsUpdateConstraints: Bool {
+        get {
+            guard !representatableStateFlags.contains(.dismantled) else {
+                return false
+            }
+            
+            return super.needsUpdateConstraints
+        } set {
+            guard !representatableStateFlags.contains(.dismantled) else {
+                return
+            }
+            
+            super.needsUpdateConstraints = true
+        }
+    }
+    #endif
     
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
     override open var textStorage: NSTextStorage {
@@ -97,7 +128,7 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
             return super.textStorage
         }
     }
-    #else
+    #elseif os(macOS)
     override open var textStorage: NSTextStorage? {
         if let textStorage = _customTextStorage {
             return textStorage
@@ -153,8 +184,8 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
             }
             
             let desiredHorizontalContentHuggingPriority = preferredMaximumDimensions.width == nil
-            ? AppKitOrUIKitLayoutPriority.defaultLow
-            : AppKitOrUIKitLayoutPriority.defaultHigh
+                ? AppKitOrUIKitLayoutPriority.defaultLow
+                : AppKitOrUIKitLayoutPriority.defaultHigh
             
             if contentHuggingPriority(for: .horizontal) != desiredHorizontalContentHuggingPriority {
                 setContentHuggingPriority(
@@ -164,8 +195,8 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
             }
             
             let desiredVerticalContentHuggingPriority = preferredMaximumDimensions.height == nil
-            ? AppKitOrUIKitLayoutPriority.defaultLow
-            : AppKitOrUIKitLayoutPriority.defaultHigh
+                ? AppKitOrUIKitLayoutPriority.defaultLow
+                : AppKitOrUIKitLayoutPriority.defaultHigh
             
             if contentHuggingPriority(for: .vertical) != desiredVerticalContentHuggingPriority {
                 setContentHuggingPriority(
@@ -184,12 +215,36 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     }
     #endif
     
+    var _cachedIntrinsicContentSizeUsedAtLeastOnce: Bool = false
+    
     override open var intrinsicContentSize: CGSize {
+        if let _fixedSize = configuration._fixedSize {
+            if _fixedSize == (false, false) {
+                return CGSize(width: AppKitOrUIKitView.noIntrinsicMetric, height: AppKitOrUIKitView.noIntrinsicMetric)
+            }
+        }
+        
         if let result = representableCache._cachedIntrinsicContentSize {
+            _cachedIntrinsicContentSizeUsedAtLeastOnce = true
+            
             return result
         } else {
-            return super.intrinsicContentSize
+            let result = super.intrinsicContentSize
+            
+            representableCache._cachedIntrinsicContentSize = result
+            
+            return result
         }
+    }
+    
+    var _SwiftUIX_intrinsicContentSizeIsDisabled: Bool {
+        if let _fixedSize = configuration._fixedSize {
+            if _fixedSize == (false, false) {
+                return true
+            }
+        }
+        
+        return false
     }
     
     public convenience required init(
@@ -238,6 +293,10 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         configuration: TextView<Label>._Configuration,
         context: some _AppKitOrUIKitViewRepresentableContext
     ) {
+        if #available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *) {
+            self._textEditorProxyBase = context.environment._textViewProxy?.wrappedValue._base
+        } 
+        
         _PlatformTextView<Label>.updateAppKitOrUIKitTextView(
             self,
             data: data,
@@ -245,13 +304,17 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
             context: context
         )
         
-        _lazyTrackedTextCursor?.update()
+        _lazy_observableTextCursor?.update()
     }
     
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
     override open func layoutSubviews() {
         super.layoutSubviews()
         
+        guard !representatableStateFlags.contains(.dismantled) else {
+            return
+        }
+
         verticallyCenterTextIfNecessary()
     }
     #elseif os(macOS)
@@ -272,6 +335,8 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         representableCache.invalidate(.intrinsicContentSize)
                 
         super.invalidateIntrinsicContentSize()
+        
+        _cachedIntrinsicContentSizeUsedAtLeastOnce = false
     }
     
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
@@ -303,6 +368,24 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     #endif
     
     #if os(macOS)
+    open override func draggingEntered(
+        _ sender: NSDraggingInfo
+    ) -> NSDragOperation {
+        _SwiftUIX_draggingEntered(sender)
+    }
+    
+    open override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        _SwiftUIX_draggingUpdated(sender)
+    }
+
+    override open func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        _SwiftUIX_performDragOperation(sender)
+    }
+
+    override open func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        _SwiftUIX_draggingExited(sender)
+    }
+        
     open override func insertText(
         _ insertString: Any,
         replacementRange: NSRange
@@ -313,8 +396,8 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
             return
         }
         
-        if let text = (insertString as? String) ?? (insertString as? NSAttributedString)?.string {
-            _lastInsertedString = text
+        if let text = insertString as? String {
+            _lastInsertedString = NSAttributedString(string: text)
             
             let currentLength = textStorage.length
             
@@ -330,6 +413,33 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
                     )
                 )
             }
+        } else if let insertString = insertString as? NSAttributedString {
+            _lastInsertedString = insertString
+            
+            let currentLength = textStorage.length
+            
+            if insertString._isSingleTextAttachment {
+                if replacementRange.length == 0 {
+                    textStorage.replaceCharacters(in: replacementRange, with: insertString)
+                } else {
+                    assertionFailure()
+                }
+            } else {
+                super.insertText(insertString, replacementRange: replacementRange)
+            }
+            
+            if replacementRange.location == currentLength {
+                _publishTextEditorEvent(
+                    .append(text: insertString)
+                )
+            } else {
+                _publishTextEditorEvent(
+                    .insert(
+                        text: insertString,
+                        range: replacementRange.location == 0 ? nil : replacementRange
+                    )
+                )
+            }
         } else {
             super.insertText(insertString, replacementRange: replacementRange)
         }
@@ -339,15 +449,25 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         in affectedCharRange: NSRange,
         replacementString: String?
     ) -> Bool {
-        if let _lastInsertedString = _lastInsertedString, replacementString == _lastInsertedString {
+        if let _lastInsertedString = _lastInsertedString, replacementString == _lastInsertedString.string {
             self._lastInsertedString = nil
         } else if let replacementString = replacementString {
-            self._publishTextEditorEvent(.replace(text: .init(string: replacementString), range: affectedCharRange))
+            self._publishTextEditorEvent(
+                .replace(
+                    text: NSAttributedString(string: replacementString),
+                    range: affectedCharRange
+                )
+            )
         } else {
             if _lazyTextEditorEventSubject != nil {
                 let deletedText = _SwiftUIX_attributedText.attributedSubstring(from: affectedCharRange)
                 
-                self._publishTextEditorEvent(.delete(text: deletedText, range: affectedCharRange))
+                self._publishTextEditorEvent(
+                    .delete(
+                        text: deletedText,
+                        range: affectedCharRange
+                    )
+                )
             }
         }
         
@@ -377,12 +497,16 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
             affinity: affinity,
             stillSelecting: stillSelectingFlag
         )
+        
+        _lazy_observableTextCursor?.update()
     }
     
     override open func deleteBackward(_ sender: Any?) {
         super.deleteBackward(sender)
         
         configuration.onDeleteBackward()
+        
+        _lazy_observableTextCursor?.update()
     }
     
     override open func preferredPasteboardType(
@@ -531,7 +655,7 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         }
         
         if representatableStateFlags.contains(.updateInProgress) {
-            DispatchQueue.main.async {
+            Task.detached(priority: .userInitiated) { @MainActor in
                 operation()
             }
         } else {
@@ -551,14 +675,20 @@ extension _PlatformTextView {
             return nil
         }
                 
+        if let _fixedSize = configuration._fixedSize {
+            if _fixedSize == (false, false) {
+                return nil
+            }
+        }
+        
         if let cached = representableCache.sizeThatFits(proposal: proposal) {
             return cached
         } else {
             assert(proposal.size.maximum == nil)
             
-            let _sizeThatFits = _uncachedSizeThatFits(for: targetWidth)
+            let _sizeThatFits: CGSize? = _uncachedSizeThatFits(for: targetWidth)
             
-            guard var result = _sizeThatFits else {
+            guard var result: CGSize = _sizeThatFits else {
                 return nil
             }
             
@@ -627,6 +757,7 @@ extension _PlatformTextView {
         {
             let usedRect = layoutManager.usedRect(for: textContainer).size
 
+            /// DO NOT REMOVE.
             if usedRect.isAreaZero {
                 return _sizeThatFits(width: width)
             }
@@ -642,13 +773,25 @@ extension _PlatformTextView {
 
 @_spi(Internal)
 @available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-extension _PlatformTextView: _PlatformTextView_Type {
-    func _publishTextEditorEvent(_ event: _SwiftUIX_TextEditorEvent) {
-        DispatchQueue.main.async {
+extension _PlatformTextView: _PlatformTextViewType {
+    func _publishTextEditorEvent(_ event: _SwiftUIX_TextEditorEvent) {                
+        Task.detached(priority: .userInitiated) { @MainActor in
             self._performOrSchedulePublishingChanges {
                 self._lazyTextEditorEventSubject?.send(event)
             }
         }
+    }
+}
+
+// MARK: - Helpers
+
+extension NSAttributedString {
+    var _isSingleTextAttachment: Bool {
+        guard length == 1, self.string.first! == Character(UnicodeScalar(NSTextAttachment.character)!) else {
+            return false
+        }
+        
+        return true
     }
 }
 

@@ -10,9 +10,15 @@ import SwiftUI
 
 public protocol _CocoaHostingControllerOrView: AppKitOrUIKitResponder {
     var _SwiftUIX_cancellables: [AnyCancellable] { get set }
-    
     var _configuration: CocoaHostingControllerConfiguration { get set }
+    var _hostingViewConfigurationFlags: Set<_CocoaHostingViewConfigurationFlag> { get }
+    var _hostingViewStateFlags: Set<_CocoaHostingViewStateFlag> { get }
     var _observedPreferenceValues: _ObservedPreferenceValues { get }
+    
+    func withCriticalScope<Result>(
+        _ flags: Set<_CocoaHostingViewConfigurationFlag>,
+        perform action: () -> Result
+    ) -> Result
 }
 
 public protocol CocoaViewController: AppKitOrUIKitViewController {

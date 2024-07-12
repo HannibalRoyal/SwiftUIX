@@ -54,6 +54,7 @@ public struct EditableText: View {
     @StateOrBinding private var isEditing: Bool
 
     private var lineLimit: Int? = 1
+    private var onSubmit: (String) -> () = { _ in }
     
     public init(
         _ placeholder: String? = nil,
@@ -62,6 +63,10 @@ public struct EditableText: View {
         activation: Set<Activation> = [.onDoubleTap],
         onCommit: @escaping (String) -> Void = { _ in }
     ) {
+        if let placeholder {
+            assert(!placeholder.isEmpty)
+        }
+
         self.placeholder = placeholder
         self._text = text
         self._textBeingEdited = .init(initialValue: text.wrappedValue)
@@ -75,7 +80,11 @@ public struct EditableText: View {
         text: Binding<String?>,
         isEditing: Binding<Bool>? = nil
     ) {
-        self.init(placeholder, text: text.withDefaultValue(""), isEditing: isEditing)
+        self.init(
+            placeholder,
+            text: text.withDefaultValue(""),
+            isEditing: isEditing
+        )
     }
 
     public var body: some View {
@@ -194,31 +203,9 @@ public struct EditableText: View {
     private var editableDisplay: some View {
         Group {
             if lineLimit == 1 {
-                TextField(
-                    "",
-                    text: $textBeingEdited,
-                    onEditingChanged: { isEditing in
-                        onEditingChanged(isEditing)
-                    },
-                    onCommit: {
-                        endEditing()
-                    }
-                )
-                .textFieldStyle(.roundedBorder)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(1)
+                _lineLimitOneTextField
             } else {
-                TextView(
-                    "",
-                    text: $textBeingEdited,
-                    onEditingChanged: { isEditing in
-                        onEditingChanged(isEditing)
-                    },
-                    onCommit: {
-                        endEditing()
-                    }
-                )
-                .fixedSize(horizontal: false, vertical: true)
+                _noLineLimitTextView
             }
         }
         ._overrideOnExitCommand {
@@ -226,6 +213,36 @@ public struct EditableText: View {
         }
     }
 
+    private var _lineLimitOneTextField: some View {
+        TextField(
+            "" as String,
+            text: $textBeingEdited,
+            onEditingChanged: { (isEditing: Bool) in
+                onEditingChanged(isEditing)
+            },
+            onCommit: {
+                endEditing()
+            }
+        )
+        .textFieldStyle(.plain)
+        .fixedSize(horizontal: false, vertical: true)
+        .lineLimit(1)
+    }
+    
+    private var _noLineLimitTextView: some View {
+        TextView(
+            "" as String,
+            text: $textBeingEdited,
+            onEditingChanged: { (isEditing: Bool) in
+                onEditingChanged(isEditing)
+            },
+            onCommit: {
+                endEditing()
+            }
+        )
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    
     private func onEditingChanged(_ isEditing: Bool) {
         #if !os(macOS)
         if editMode == nil {
@@ -290,6 +307,7 @@ public struct EditableText: View {
         self.textBeingEdited = nil
         
         onCommit(textBeingEdited)
+        onSubmit(textBeingEdited)
     }
 }
 
@@ -297,7 +315,20 @@ public struct EditableText: View {
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
 extension EditableText {
-    public func lineLimit(_ lineLimit: Int?) -> Self {
+    public func onSubmit(
+        _ action: @escaping (String) -> Void
+    ) -> Self {
+        then({ $0.onSubmit = action })
+    }
+}
+
+@available(iOS 15.0, macOS 12.0, *)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+extension EditableText {
+    public func lineLimit(
+        _ lineLimit: Int?
+    ) -> Self {
         then({ $0.lineLimit = lineLimit })
     }
 }

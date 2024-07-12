@@ -5,50 +5,46 @@
 import Swift
 import SwiftUI
 
-final class KeyedBoundedPriorityQueue<Key: Hashable, Value> {
-    private class Node {
-        var key: Key
-        var value: Value
-        var next: Node?
-        
-        weak var previous: Node?
-        
-        init(key: Key, value: Value) {
-            self.key = key
-            self.value = value
-        }
-    }
-
-    var maximumCapacity: Int?
+@_spi(Internal)
+public final class KeyedBoundedPriorityQueue<Key: Hashable, Value> {
+    @usableFromInline
+    var maximumCapacity: Int
+    @usableFromInline
+    var nodes: [Key: Node] = [:]
+    @usableFromInline
+    var head: Node?
+    @usableFromInline
+    var tail: Node?
+    @usableFromInline
+    var markedForDeletion: Set<Key> = []
     
-    private var nodes: [Key: Node] = [:]
-    private var head: Node?
-    private var tail: Node?
-        
-    init(maximumCapacity: Int? = 100) {
+    public init(maximumCapacity: Int) {
         self.maximumCapacity = maximumCapacity
     }
     
-    private func appendNode(_ node: Node) {
-        nodes[node.key] = node
+    @_optimize(speed)
+    @usableFromInline
+    func _appendNode(_ node: Node) {
+        if (nodes.count - markedForDeletion.count) >= maximumCapacity {
+            if let lraNode = head {
+                _removeNode(lraNode)
+            }
+        }
         
         if let oldTail = tail {
             oldTail.next = node
             node.previous = oldTail
-            tail = node
         } else {
             head = node
-            tail = node
         }
         
-        if let maxSize = maximumCapacity {
-            if nodes.count > maxSize {
-                removeFirstNode()
-            }
-        }
+        tail = node
+        nodes[node.key] = node
     }
     
-    private func removeNode(_ node: Node) {
+    @_optimize(speed)
+    @usableFromInline
+    func _removeNode(_ node: Node) {
         node.previous?.next = node.next
         node.next?.previous = node.previous
         
@@ -60,46 +56,74 @@ final class KeyedBoundedPriorityQueue<Key: Hashable, Value> {
             tail = node.previous
         }
         
-        nodes[node.key] = nil
+        nodes.removeValue(forKey: node.key)
     }
     
-    private func removeFirstNode() {
-        head.map(removeNode)
+    @_optimize(speed)
+    @usableFromInline
+    func _removeFirstValidNode() {
+        while let key = head?.key, markedForDeletion.contains(key) {
+            _removeNode(head!)
+            markedForDeletion.remove(key)
+        }
     }
     
-    private func removeLastNode() {
-        tail.map(removeNode)
-    }
-    
-    private func moveNodeToLast(_ node: Node) {
+    @_optimize(speed)
+    @usableFromInline
+    func _moveNodeToLast(_ node: Node) {
         guard node !== tail else {
             return
         }
         
-        removeNode(node)
-        appendNode(node)
+        if node === head {
+            head = node.next
+        }
+        
+        node.next?.previous = node.previous
+        node.previous?.next = node.next
+        
+        tail?.next = node
+        node.previous = tail
+        node.next = nil
+        tail = node
     }
 }
 
 extension KeyedBoundedPriorityQueue {
-    var count: Int {
-        nodes.count
+    public var count: Int {
+        @_optimize(speed)
+        @inline(__always)
+        get {
+            nodes.count
+        }
     }
     
-    var first: Value? {
-        head?.value
+    public var first: Value? {
+        @_optimize(speed)
+        @inline(__always)
+        get {
+            head?.value
+        }
     }
     
-    var last: Value? {
-        tail?.value
+    public var last: Value? {
+        @_optimize(speed)
+        @inline(__always)
+        get {
+            tail?.value
+        }
     }
     
-    subscript(_ key: Key) -> Value? {
+    @_optimize(speed)
+    @inline(__always)
+    public subscript(_ key: Key) -> Value? {
         get {
             nodes[key]?.value
         } set {
             guard let newValue = newValue else {
-                nodes[key].map(removeNode)
+                if let existing = nodes[key] {
+                    _removeNode(existing)
+                }
                 
                 return
             }
@@ -107,20 +131,67 @@ extension KeyedBoundedPriorityQueue {
             if let node = nodes[key] {
                 node.value = newValue
                 
-                moveNodeToLast(node)
+                _moveNodeToLast(node)
             } else {
                 let node = Node(key: key, value: newValue)
                 
-                appendNode(node)
+                _appendNode(node)
             }
+        }
+    }
+    
+    @_optimize(speed)
+    @inline(__always)
+    public func removeValue(forKey key: Key) {
+        self[key] = nil
+    }
+}
+
+// MARK: - Conformances
+
+extension KeyedBoundedPriorityQueue: ExpressibleByDictionaryLiteral {
+    public convenience init(dictionaryLiteral elements: (Key, Value)...) {
+        self.init(maximumCapacity: elements.count)
+        
+        for (key, value) in elements {
+            self[key] = value
         }
     }
 }
 
 extension KeyedBoundedPriorityQueue: Sequence {
-    public typealias Iterator = AnyIterator<(key: Key, value: Value)>
-    
     public func makeIterator() -> AnyIterator<(key: Key, value: Value)> {
-        AnyIterator(nodes.mapValues({ $0.value }).makeIterator())
+        var current = head
+        
+        return AnyIterator {
+            defer {
+                current = current?.next
+            }
+            
+            return current.map({ ($0.key, $0.value) })
+        }
+    }
+}
+
+// MARK: - Auxiliary
+
+extension KeyedBoundedPriorityQueue {
+    @usableFromInline
+    class Node {
+        @usableFromInline
+        var key: Key
+        @usableFromInline
+        var value: Value
+        @usableFromInline
+        var next: Node?
+        
+        @usableFromInline
+        weak var previous: Node?
+        
+        @usableFromInline
+        init(key: Key, value: Value) {
+            self.key = key
+            self.value = value
+        }
     }
 }

@@ -12,7 +12,7 @@ extension View {
     ///
     /// This implementation relies on the assumpion that a SwiftUI sheet is backed by a `UIViewController` or an `NSViewController`.
     /// Use `Color.clear` if you wish to set the underlying view controller's `view.backgroundColor` to `nil`.
-    public func sheetBackground(_ color: Color) -> some View {
+    public func sheetBackground(_ color: Color?) -> some View {
         modifier(_UpdateSheetBackground(color: color))
     }
 }
@@ -20,10 +20,14 @@ extension View {
 // MARK: - Auxiliary
 
 struct _UpdateSheetBackground: ViewModifier {
-    let color: Color
-    
+    let color: Color?
+
     @State private var didSet: Bool = false
     
+    init(color: Color?) {
+        self.color = color
+    }
+
     func body(content: Content) -> some View {
         content.onAppKitOrUIKitViewControllerResolution { viewController in
             guard !didSet else {
@@ -35,13 +39,13 @@ struct _UpdateSheetBackground: ViewModifier {
             }
             
             #if os(iOS) || os(tvOS)
-            let newBackgroundColor = color == .clear ? color.toUIColor() : nil
-            
+            let newBackgroundColor = color == .clear ? color?.toUIColor() : nil
+
             (viewController.root ?? viewController).view.backgroundColor = newBackgroundColor
             #else
             if #available(macOS 11, *) {
                 viewController.view.wantsLayer = true
-                viewController.view.layer?.backgroundColor = color.cgColor
+                viewController.view.layer?.backgroundColor = color?.cgColor
             }
             #endif
         }

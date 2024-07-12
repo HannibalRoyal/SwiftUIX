@@ -9,8 +9,8 @@ import SwiftUI
 
 public struct _TextViewConfiguration {
     public var _fixedSize: (Bool, Bool)? = nil
-    
-    var isConstant: Bool = false
+    public var isContentCopyable: Bool = true
+    public var isConstant: Bool = false
     
     public var onEditingChanged: (Bool) -> Void = { _ in }
     public var onCommit: (() -> Void)?
@@ -43,6 +43,21 @@ public struct _TextViewConfiguration {
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
     var keyboardType: UIKeyboardType = .default
     var returnKeyType: UIReturnKeyType?
+    #endif
+    
+    public var _dropDelegate: Any?
+    
+    #if !os(tvOS)
+    @available(iOS 16.0, macOS 13.0, *)
+    @available(tvOS, unavailable)
+    @available(watchOS, unavailable)
+    public var dropDelegate: (any _SwiftUIX_DropDelegate<_SwiftUIX_DropInfo>)? {
+        get {
+            _dropDelegate.map({ $0 as! (any _SwiftUIX_DropDelegate<_SwiftUIX_DropInfo>) })
+        } set {
+            _dropDelegate = newValue
+        }
+    }
     #endif
     
     var requiresAttributedText: Bool {
@@ -264,3 +279,25 @@ extension View {
         environment(\.lineBreakMode, lineBreakMode)
     }
 }
+
+// MARK: - Internal
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
+
+extension EnvironmentValues {
+    public struct _TextViewConfigurationMutationKey: EnvironmentKey {
+        public typealias Value = (inout _TextViewConfiguration) -> Void
+        
+        public static let defaultValue: Value = { _ in }
+    }
+    
+    public var _textViewConfigurationMutation: _TextViewConfigurationMutationKey.Value {
+        get {
+            self[_TextViewConfigurationMutationKey.self]
+        } set {
+            self[_TextViewConfigurationMutationKey.self] = newValue
+        }
+    }
+}
+
+#endif

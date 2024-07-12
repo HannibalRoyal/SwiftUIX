@@ -198,6 +198,27 @@ final class WeakReferenceBox<T: AnyObject>: _SwiftUIX_AnyIndirectValueBox {
     }
 }
 
+@propertyWrapper
+final class UnsafeWeakReferenceBox<T>: _SwiftUIX_AnyIndirectValueBox {
+    private weak var value: AnyObject?
+    
+    var wrappedValue: T? {
+        get {
+            value.map({ $0 as! T })
+        } set {
+            value = newValue.map({ $0 as AnyObject })
+        }
+    }
+    
+    init(_ value: T?) {
+        self.value = value.map({ $0 as AnyObject })
+    }
+    
+    init(wrappedValue value: T?) {
+        self.value = value.map({ $0 as AnyObject })
+    }
+}
+
 @_spi(Internal)
 @propertyWrapper
 public final class _SwiftUIX_ObservableReferenceBox<Value>: ObservableObject {
@@ -227,8 +248,14 @@ public final class _SwiftUIX_ObservableReferenceBox<Value>: ObservableObject {
 @_spi(Internal)
 @propertyWrapper
 public final class _SwiftUIX_ObservableWeakReferenceBox<T: AnyObject>: ObservableObject {
+    public let objectWillChange: ObservableObjectPublisher
+    
     public weak var value: T? {
-        willSet {
+        willSet {            
+            guard newValue !== value else {
+                return
+            }
+            
             objectWillChange.send()
         }
     }
@@ -241,8 +268,21 @@ public final class _SwiftUIX_ObservableWeakReferenceBox<T: AnyObject>: Observabl
         }
     }
     
+    public var projectedValue: _SwiftUIX_ObservableWeakReferenceBox {
+        self
+    }
+    
     public init(_ value: T?) {
         self.value = value
+        
+        self.objectWillChange = .init()
+    }
+    
+    public init(
+        _ value: T?
+    ) where T: ObservableObject, T.ObjectWillChangePublisher == ObservableObjectPublisher {
+        self.value = value
+        self.objectWillChange = value?.objectWillChange ?? .init()
     }
 }
 

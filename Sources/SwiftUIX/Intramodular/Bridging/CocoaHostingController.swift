@@ -27,7 +27,10 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
             rootView.parentConfiguration = _configuration
         }
     }
-        
+    
+    public var _hostingViewConfigurationFlags: Set<_CocoaHostingViewConfigurationFlag> = []
+    public var _hostingViewStateFlags: Set<_CocoaHostingViewStateFlag> = []
+            
     public var _SwiftUIX_cancellables: [AnyCancellable] = []
     
     public var _observedPreferenceValues = _ObservedPreferenceValues()
@@ -47,7 +50,15 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
     var _didResizeParentWindowOnce: Bool = false
 
     #if os(macOS)
-    weak var parentPopover: NSPopover?
+    weak var _SwiftUIX_parentNSPopover: NSPopover? {
+        didSet {
+            if _SwiftUIX_parentNSPopover != nil {
+                if #available(macOS 13.0, *) {
+                    _assignIfNotEqual([.preferredContentSize], to: \.sizingOptions)
+                }
+            }
+        }
+    }
     #endif
     
     public var mainView: Content {
@@ -120,6 +131,28 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
         fatalError("init(coder:) has not been implemented")
     }
     
+    public func withCriticalScope<Result>(
+        _ flags: Set<_CocoaHostingViewConfigurationFlag>,
+        perform action: () -> Result
+    ) -> Result {
+        assertionFailure("unimplemented")
+    
+        return action()
+    }
+    
+    public func _configureSizingOptions(for type: AppKitOrUIKitResponder.Type) {
+        #if os(macOS)
+        switch type {
+            case is AppKitOrUIKitWindow.Type:
+                if #available(macOS 13.0, *) {
+                    sizingOptions = [.intrinsicContentSize, .preferredContentSize]
+                }
+            default:
+                assertionFailure()
+        }
+        #endif
+    }
+    
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
     override open func loadView() {
         super.loadView()
@@ -161,25 +194,48 @@ open class CocoaHostingController<Content: View>: AppKitOrUIKitHostingController
     override open func viewDidLayout() {
         super.viewDidLayout()
         
-        if !view.frame.size._isNormal || view.frame.size.isAreaZero {
-            let size = sizeThatFits(in: NSView.layoutFittingCompressedSize)
+        if #available(macOS 13.0, *) {
+            let isManagedBySwiftUI = sizingOptions.contains(.preferredContentSize) || sizingOptions.contains(.intrinsicContentSize)
             
-            DispatchQueue.main.async {
-                if let popover = self.parentPopover {
-                    popover.contentSize = size
-                } else {
-                    self.preferredContentSize = size
-                }
+            if !isManagedBySwiftUI {
+                _determineAndSetPreferredContentSize()
             }
+        } else {
+            _determineAndSetPreferredContentSize()
         }
     }
     #endif
     
-    public func _namedViewDescription(for name: AnyHashable) -> _NamedViewDescription? {
+    private func _determineAndSetPreferredContentSize() {
+        guard !view.frame.size._isNormal || view.frame.size.isAreaZero else {
+            return
+        }
+        
+        let size = sizeThatFits(in: AppKitOrUIKitView.layoutFittingCompressedSize)
+
+        #if os(macOS)
+        if !size.isAreaZero {
+            DispatchQueue.main.async { [weak self] in
+                if let popover = self?._SwiftUIX_parentNSPopover {
+                    popover._assignIfNotEqual(size, to: \.contentSize)
+                } else {
+                    self?._assignIfNotEqual(size, to: \.preferredContentSize)
+                }
+            }
+        }
+        #endif
+    }
+    
+    public func _namedViewDescription(
+        for name: AnyHashable
+    ) -> _NamedViewDescription? {
         _namedViewDescriptions[name]
     }
     
-    public func _setNamedViewDescription(_ description: _NamedViewDescription?, for name: AnyHashable) {
+    public func _setNamedViewDescription(
+        _ description: _NamedViewDescription?,
+        for name: AnyHashable
+    ) {
         _namedViewDescriptions[name] = description
     }
     

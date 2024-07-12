@@ -13,6 +13,11 @@ public protocol _opaque_AppKitOrUIKitHostingControllerProtocol {
 
 @MainActor
 public protocol AppKitOrUIKitHostingControllerProtocol: _opaque_AppKitOrUIKitHostingControllerProtocol, AppKitOrUIKitViewController {
+    #if os(macOS)
+    @available(macOS 13.0, *)
+    var sizingOptions: NSHostingSizingOptions { get set }
+    #endif
+    
     @MainActor
     func sizeThatFits(in _: CGSize) -> CGSize
 }
@@ -47,7 +52,23 @@ extension AppKitOrUIKitHostingControllerProtocol {
         let fitSize = sizeProposal._fitAppKitOrUIKitSize
 
         guard !sizeProposal.fixedSize else {
-            return targetSize
+            var result = targetSize
+            
+            if layoutImmediately {
+                view._UIKit_only_sizeToFit()
+            }
+            
+            let intrinsicContentSize = view.intrinsicContentSize
+            
+            if !intrinsicContentSize.width._isInvalidForIntrinsicContentSize {
+                result.width = intrinsicContentSize.width
+            }
+            
+            if !intrinsicContentSize.height._isInvalidForIntrinsicContentSize {
+                result.height = intrinsicContentSize.height
+            }
+            
+            return result
         }
 
         #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
@@ -269,6 +290,14 @@ extension OptionalDimensions {
             width: width ?? replacement.width,
             height: height ?? replacement.height
         )
+    }
+    
+    public func toCGSize() -> CGSize? {
+        guard let width, let height else {
+            return nil
+        }
+        
+        return CGSize(width: width, height: height)
     }
 }
 

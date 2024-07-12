@@ -18,16 +18,6 @@ extension View {
     }
 }
 
-// MARK: - View.eraseToAnyView
-
-extension View {
-    /// Returns a type-erased version of `self`.
-    @inlinable
-    public func eraseToAnyView() -> AnyView {
-        return .init(self)
-    }
-}
-
 // MARK: - View.background
 
 extension View {
@@ -78,7 +68,7 @@ extension View {
 
 extension View {
     public func listRowBackground<Content: View>(
-        @ViewBuilder background: () -> Content
+        @ViewBuilder _ background: () -> Content
     ) -> some View {
         listRowBackground(background())
     }
@@ -148,6 +138,24 @@ extension View {
     @inlinable
     public func offset(_ length: CGFloat) -> some View {
         offset(x: length, y: length)
+    }
+}
+
+// MARK: - View.onAppear
+
+extension View {
+    public func onAppearOnce(perform action: @escaping () -> Void) -> some View {
+        withInlineState(initialValue: false) { $didAppear in
+            self.onAppear {
+                guard !didAppear else {
+                    return
+                }
+                
+                action()
+                
+                didAppear = true
+            }
+        }
     }
 }
 
