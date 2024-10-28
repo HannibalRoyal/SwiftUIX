@@ -2,10 +2,13 @@
 // Copyright (c) Vatsal Manot
 //
 
+import SwiftUI
+
 @available(iOS 13, *)
 @available(tvOS 16.0, *)
 @available(watchOS, unavailable)
 @available(OSX, unavailable)
+@_documentation(visibility: internal)
 public struct _HoverEffectViewModifier: ViewModifier {
     public let hoverEffect: HoverEffect
     

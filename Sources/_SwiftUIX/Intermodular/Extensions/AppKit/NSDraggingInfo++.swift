@@ -14,22 +14,24 @@ extension NSDraggingInfo {
             return []
         }
         
-        let items = pasteboardItems.map { pasteboardItem in
+        let items = pasteboardItems.map { (pasteboardItem: NSPasteboardItem) in
             let itemProvider = NSItemProvider()
+            let pasteboardItemBox = _SwiftUIX_UnsafeSendableReferenceBox(wrappedValue: pasteboardItem)
             
             for type in pasteboardItem.types {
                 itemProvider.registerDataRepresentation(forTypeIdentifier: type.rawValue, visibility: .all) { completion in
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        if let data = pasteboardItem.data(forType: type) {
-                            DispatchQueue.main.async {
+                    Task { @MainActor in
+                        if let data = pasteboardItemBox.wrappedValue.data(forType: type) {
+                            Task { @MainActor in
                                 completion(data, nil)
                             }
                         } else {
-                            DispatchQueue.main.async {
+                            Task { @MainActor in
                                 completion(nil, NSError(domain: "DataErrorDomain", code: -1, userInfo: [NSLocalizedDescriptionKey: "Data could not be fetched for type \(type.rawValue)"]))
                             }
                         }
                     }
+                    
                     return nil
                 }
             }

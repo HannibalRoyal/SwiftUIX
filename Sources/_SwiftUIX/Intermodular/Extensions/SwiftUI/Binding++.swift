@@ -8,7 +8,16 @@ import SwiftUI
 extension Binding {
     @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
     public init(_from binding: FocusState<Value>.Binding) where Value: Hashable {
-        self.init(get: { binding.wrappedValue }, set: { binding.wrappedValue = $0 })
+        let box = _SwiftUIX_UnsafeSendableReferenceBox(wrappedValue: binding)
+        
+        self.init(
+            get: {
+                box.wrappedValue.wrappedValue
+            },
+            set: {
+                box.wrappedValue.wrappedValue = $0
+            }
+        )
     }
 }
 

@@ -4,6 +4,7 @@
 
 import SwiftUI
 
+@_documentation(visibility: internal)
 public struct _ViewTraitKeys {
     public init() {
         
@@ -22,6 +23,7 @@ extension View {
     }
     
     /// Adds a view trait value that can referenced by the value's type.
+    @_disfavoredOverload
     public func _trait<T>(
         _ key: T.Type,
         _ value: T

@@ -6,7 +6,8 @@ import SwiftUI
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
-public enum _WindowStyle {
+@_documentation(visibility: internal)
+public enum _WindowStyle: Sendable {
     case `default`
     case hiddenTitleBar
     case plain

@@ -6,6 +6,8 @@
 
 import UIKit
 
+import SwiftUI
+
 public typealias AppKitOrUIKitApplication = UIApplication
 public typealias AppKitOrUIKitApplicationDelegate = UIApplicationDelegate
 @available(iOS 14.0, tvOS 14.0, *)
@@ -33,6 +35,8 @@ public typealias AppKitOrUIKitLayoutPriority = UILayoutPriority
 public typealias AppKitOrUIKitPasteboard = UIPasteboard
 public typealias AppKitOrUIKitRectCorner = UIRectCorner
 public typealias AppKitOrUIKitResponder = UIResponder
+@available(visionOS, unavailable)
+public typealias AppKitOrUIKitScreen = UIScreen
 public typealias AppKitOrUIKitScrollView = UIScrollView
 public typealias AppKitOrUIKitSplitViewController = UISplitViewController
 public typealias AppKitOrUIKitSearchBar = UISearchBar
@@ -77,6 +81,7 @@ public typealias AppKitOrUIKitLayoutPriority = NSLayoutConstraint.Priority
 public typealias AppKitOrUIKitPasteboard = NSPasteboard
 public typealias AppKitOrUIKitRectCorner = NSRectCorner
 public typealias AppKitOrUIKitResponder = NSResponder
+public typealias AppKitOrUIKitScreen = NSScreen
 public typealias AppKitOrUIKitSearchBar = NSSearchField
 public typealias AppKitOrUIKitSplitViewController = NSSplitViewController
 public typealias AppKitOrUIKitTableView = NSTableView

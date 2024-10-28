@@ -13,6 +13,8 @@ public protocol _opaque_AppKitOrUIKitHostingControllerProtocol {
 
 @MainActor
 public protocol AppKitOrUIKitHostingControllerProtocol: _opaque_AppKitOrUIKitHostingControllerProtocol, AppKitOrUIKitViewController {
+    func _forEachIdentifiedView(body: (_IdentifiedViewProxy) -> Void)
+
     #if os(macOS)
     @available(macOS 13.0, *)
     var sizingOptions: NSHostingSizingOptions { get set }
@@ -181,6 +183,7 @@ extension AppKitOrUIKitHostingControllerProtocol {
 
 // MARK: - Auxiliary
 
+@_documentation(visibility: internal)
 public struct AppKitOrUIKitLayoutSizeProposal: Hashable {
     public struct _SizingConstraints: Hashable {
         public fileprivate(set) var minimum: OptionalDimensions

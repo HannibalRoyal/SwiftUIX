@@ -15,9 +15,11 @@ import UIKit
 #endif
 
 /// A value relative to one or multiple coordinate spaces.
-public struct _CoordinateSpaceRelative<Value: Equatable>: Equatable {
-    private weak var __sourceAppKitOrUIKitWindow: NSObject?
+@_documentation(visibility: internal)
+public struct _CoordinateSpaceRelative<Value: Equatable & Sendable>: Equatable, Sendable {
     private var storage: [_ScreenOrCoordinateSpace: Value] = [:]
+    
+    private weak var __sourceAppKitOrUIKitWindow: (NSObject & Sendable)?
     
     init(
         storage: [_ScreenOrCoordinateSpace: Value],
@@ -39,7 +41,11 @@ public struct _CoordinateSpaceRelative<Value: Equatable>: Equatable {
         _ key: _ScreenOrCoordinateSpace
     ) -> Value? {
         get {
-            storage[key]
+            guard let result = storage[key] else {
+                return nil
+            }
+            
+            return result
         } set {
             storage[key] = newValue
         }
@@ -142,6 +148,15 @@ extension _CoordinateSpaceRelative where Value == CGRect {
     }
 }
 #endif
+
+// MARK: - Conformances
+
+extension _CoordinateSpaceRelative: Hashable where Value: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(storage)
+        hasher.combine(__sourceAppKitOrUIKitWindow)
+    }
+}
 
 // MARK: - Supplementary
 

@@ -11,6 +11,7 @@ import SwiftUI
 @available(macCatalystApplicationExtension, unavailable)
 @available(iOSApplicationExtension, unavailable)
 @available(tvOSApplicationExtension, unavailable)
+@_documentation(visibility: internal)
 public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
     @PersistentObject private var _windowBox: _SwiftUIX_ObservableWeakReferenceBox<AppKitOrUIKitHostingWindow<Content>>
     @PersistentObject private var _popoverBox: _SwiftUIX_ObservableWeakReferenceBox<_AnyAppKitOrUIKitHostingPopover>
@@ -22,18 +23,24 @@ public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
     var _window: AppKitOrUIKitHostingWindow<Content>? {
         get {
             _windowBox.wrappedValue
-        } nonmutating set {
-            _windowBox.wrappedValue = newValue
+        } set {
+            _windowBox = .init(newValue)
             
-            if let popover = self._popover {
-                DispatchQueue.main.async {
-                    if popover.isDetached {
-                        assert(_window != nil)
-                        
-                        self._popover = nil
-                        self.wasInitializedWithPopover = false
-                    }
-                }
+            _didJustSetWindowBox()
+        }
+    }
+    
+    private func _didJustSetWindowBox() {
+        guard let popover = self._popover else {
+            return
+        }
+        
+        DispatchQueue.main.async {
+            if popover.isDetached {
+                assert(_windowBox.wrappedValue != nil)
+                
+                self._popoverBox.wrappedValue = nil
+                self.wasInitializedWithPopover = false
             }
         }
     }
@@ -41,8 +48,8 @@ public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
     var _popover: _AnyAppKitOrUIKitHostingPopover? {
         get{
             _popoverBox.wrappedValue
-        } nonmutating set {
-            _popoverBox.wrappedValue = newValue
+        } set {
+            _popoverBox = .init(newValue)
         }
     }
     
@@ -55,12 +62,14 @@ public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
     
     private var presentationManager: _PresentationManager {
         _PresentationManager(
-            _window: _windowBox,
-            _popover: _popoverBox
+            isPresentationInitialized: initialized,
+            presentationContentType: Content.self,
+            _window: _windowBox.wrappedValue,
+            _popover: _popoverBox.wrappedValue
         )
     }
     
-    var initialized: Bool = true
+    package var initialized: Bool = true
     
     init(
         window: AppKitOrUIKitHostingWindow<Content>?,
@@ -76,7 +85,13 @@ public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
         }
         
         self.__windowBox = .init(wrappedValue: .init(_window))
-        self.__popoverBox = .init(wrappedValue: .init(_popover))
+        
+        if let popover {
+            self.__popoverBox = .init(wrappedValue: .init(popover))
+        } else {
+            self.__popoverBox = .init(wrappedValue: .init(nil))
+        }
+        
         self.content = content
         self.isPresented = isPresented
         self._wasInitializedWithPopover = .init(initialValue: _popover != nil)
@@ -93,12 +108,12 @@ public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
                     )
                 )
                 ._onChange(of: _window != nil) { _ in
-                    DispatchQueue.main.async {
+                    Task.detached { @MainActor in
                         _flushWindowUpdates()
                     }
                 }
                 ._onChange(of: queuedWindowUpdates.count) { _ in
-                    DispatchQueue.main.async {
+                    Task.detached { @MainActor in
                         _flushWindowUpdates()
                     }
                 }
@@ -174,10 +189,11 @@ public struct _AppKitOrUIKitHostingWindowContent<Content: View>: View {
 
 extension _AppKitOrUIKitHostingWindowContent {
     struct _PresentationManager: PresentationManager {
-        @_SwiftUIX_ObservableWeakReferenceBox
-        var _window: AppKitOrUIKitHostingWindow<Content>?
-        @_SwiftUIX_ObservableWeakReferenceBox
-        var _popover: _AnyAppKitOrUIKitHostingPopover?
+        let isPresentationInitialized: Bool
+        let presentationContentType: any View.Type
+        
+        weak var _window: AppKitOrUIKitHostingWindow<Content>?
+        weak var _popover: _AnyAppKitOrUIKitHostingPopover?
         
         var isPresented: Bool {
             if let _popover {
@@ -190,8 +206,15 @@ extension _AppKitOrUIKitHostingWindowContent {
         }
         
         func dismiss() {
-            _popover?._SwiftUIX_dismiss()
-            _window?._SwiftUIX_dismiss()
+            assert(isPresentationInitialized)
+            
+            if let _popover {
+                _popover._SwiftUIX_dismiss()
+            } else if let _window {
+                _window._SwiftUIX_dismiss()
+            } else {
+                debugPrint("Failed to dismiss \(presentationContentType), both _popover and _window are nil.")
+            }
         }
     }
 }

@@ -6,9 +6,14 @@ import Combine
 import Swift
 import SwiftUI
 
+/// The property wrapper can be used to add non-observable state capabilities to a view property.
+///
+/// `@ViewStorage` works just like `@State`, except modifying a `@ViewStorage` wrapped value does not cause the view's body to update.
+///
+/// You can read more about how to use this property wrapper in the <doc:SwiftUI-View-Storage> article.
 @frozen
 @propertyWrapper
-public struct ViewStorage<Value>: DynamicProperty {
+public struct ViewStorage<Value>: Identifiable, DynamicProperty {
     public final class ValueBox: AnyObservableValue<Value> {
         @Published fileprivate var value: Value
         
@@ -25,6 +30,10 @@ public struct ViewStorage<Value>: DynamicProperty {
             
             super.init()
         }
+    }
+    
+    public var id: ObjectIdentifier {
+        ObjectIdentifier(valueBox)
     }
     
     @State fileprivate var _valueBox: ValueBox
@@ -79,6 +88,7 @@ extension ViewStorage {
     }
 }
 
+@MainActor
 extension ViewStorage {
     @ViewBuilder
     public func withObservedValue<Content: View>(

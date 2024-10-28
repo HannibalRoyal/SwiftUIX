@@ -6,15 +6,15 @@ import SwiftUI
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
+@MainActor
+@_documentation(visibility: internal)
 public struct PresentWindow<Content: View>: View {
     private let content: () -> Content
     private let windowStyle: _WindowStyle
     private let position: _CoordinateSpaceRelative<CGPoint>?
     
-    @MainActor(unsafe)
     @PersistentObject var presentationController: _WindowPresentationController<Content>
     
-    @MainActor(unsafe)
     public init(
         style: _WindowStyle,
         position: _CoordinateSpaceRelative<CGPoint>? = nil,
@@ -24,10 +24,17 @@ public struct PresentWindow<Content: View>: View {
         self.windowStyle = style
         self.position = position
         
-        self._presentationController = .init(wrappedValue: _WindowPresentationController(
-            style: style,
-            content: content
-        ))
+        self._presentationController = .init(wrappedValue: {
+            let controller = _WindowPresentationController(
+                style: style,
+                visible: false,
+                content: content
+            )
+            
+            controller.setPosition(position)
+            
+            return controller
+        }())
     }
     
     public var body: some View {
@@ -43,11 +50,8 @@ public struct PresentWindow<Content: View>: View {
     private func present() {
         self.presentationController.content = content()
         
+        presentationController.setPosition(position)
         presentationController.show()
-        
-        if let position {
-            presentationController.setPosition(position)
-        }
         
         DispatchQueue.main.async {
             presentationController.bringToFront()

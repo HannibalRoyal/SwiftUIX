@@ -7,6 +7,7 @@ import SwiftUI
 
 #if os(iOS) || targetEnvironment(macCatalyst)
 
+@_documentation(visibility: internal)
 public struct CocoaNavigationView<Content: View>: View {
     private let content: Content
     private var configuration = _Body.Configuration()
@@ -73,7 +74,7 @@ extension CocoaNavigationView {
                     interactivePopGestureRecognizer?.delegate = self
                 }
             }
-
+            
             override func viewWillAppear(_ animated: Bool) {
                 self.view.backgroundColor = nil
                 
@@ -165,6 +166,7 @@ extension CocoaNavigationView {
 /// ```
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 7.0, *)
 @frozen
+@_documentation(visibility: internal)
 public struct _NavigationView<Content: View>: View {
     private let content: Content
     
@@ -220,6 +222,32 @@ extension NavigationLink {
             tag: tag,
             selection: selection._asOptional(defaultValue: tag),
             destination: destination
+        )
+    }
+    
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 7.0, *)
+    public init(
+        _ title: String,
+        _isActive isActive: Binding<Bool>,
+        @ViewBuilder destination: () -> Destination
+    ) where Label == Text {
+        self.init(
+            title,
+            isActive: isActive,
+            destination: destination
+        )
+    }
+    
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 7.0, *)
+    public init(
+        _ title: String,
+        _isActive isActive: Binding<Bool>,
+        destination: Destination
+    ) where Label == Text {
+        self.init(
+            title,
+            isActive: isActive,
+            destination: { destination }
         )
     }
 }
