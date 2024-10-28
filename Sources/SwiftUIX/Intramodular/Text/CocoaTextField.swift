@@ -21,6 +21,7 @@ public struct CocoaTextField<Label: View>: View {
     public enum LimitType: Equatable {
         case none
         case bytes(count: Int)
+        case length(maxLength: Int)
     }
     
     struct _Configuration {
@@ -167,6 +168,10 @@ fileprivate struct _CocoaTextField<Label: View>: UIViewRepresentable {
             case let .bytes(count: count):
                 if count > 0 {
                     textField.limitWithByte(count)
+                }
+            case let .length(maxLength: maxLength):
+                if maxLength > 0 {
+                    textField.limitWithLength(maxLength: maxLength)
                 }
             }
         }
@@ -632,10 +637,8 @@ private final class PlatformTextField: UITextField {
 extension UITextField {
     func limitWithByte(_ maxByteCount:Int) -> Void {
         if let text = self.text {
-            if let range = self.markedTextRange {
-                if let _ = self.position(from: range.start, offset: 0) {
-                    return
-                }
+            if let range = self.markedTextRange, let _ = self.position(from: range.start, offset: 0) {
+                return
             }
             let textBytes = text.lengthOfBytes(using: .utf8)
             if textBytes > maxByteCount {
@@ -656,6 +659,20 @@ extension UITextField {
                         totleBytes += currentBytes
                     }
                 }
+            }
+        }
+    }
+    
+    func limitWithLength(maxLength: Int) -> Void {
+        if let text = self.text {
+            if let range = self.markedTextRange, let _ = self.position(from: range.start, offset: 0) {
+                return
+            }
+            // 检查是否超出限制
+            if text.utf16.count > maxLength {
+                // 截取并转换为 String
+                let truncatedText = String(text.prefix(maxLength))
+                self.text = truncatedText
             }
         }
     }
