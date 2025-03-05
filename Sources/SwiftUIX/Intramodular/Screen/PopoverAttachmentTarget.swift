@@ -4,6 +4,7 @@
 
 import SwiftUI
 
+@_documentation(visibility: internal)
 public enum PopoverAttachmentTarget {
     case rect(_CoordinateSpaceRelative<CGRect>)
     
@@ -32,6 +33,18 @@ extension PopoverAttachmentTarget {
         _ proxy: IntrinsicGeometryProxy
     ) {
         guard let frame = proxy._frame(in: .global) else {
+            return nil
+        }
+        
+        self = .rect(frame, in: .global)
+    }
+    
+    public init?(
+        _ proxy: GeometryProxy
+    ) {
+        let frame = proxy.frame(in: .global)
+        
+        guard frame.width != .zero && frame.height != .zero else {
             return nil
         }
         

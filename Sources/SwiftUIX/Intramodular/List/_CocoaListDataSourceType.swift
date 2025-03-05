@@ -24,6 +24,7 @@ extension _CocoaListDataSourceType {
 
 // MARK: - Auxiliary
 
+@_documentation(visibility: internal)
 public struct _DefaultCocoaListDataSourceID: Hashable {
     let rawValue: [ListSection<_AnyCocoaListSectionID, _AnyCocoaListItemID>]
     
@@ -62,8 +63,9 @@ extension _CocoaListDataSourceType where ID == _DefaultCocoaListDataSourceID {
     }
 }
 
-// MARK: - Implemented Conformances
+// MARK: - Conformees
 
+@_documentation(visibility: internal)
 public struct _AnyCocoaListDataSource<SectionType, ItemType>: _CocoaListDataSourceType {
     public typealias ID = _DefaultCocoaListDataSourceID
     

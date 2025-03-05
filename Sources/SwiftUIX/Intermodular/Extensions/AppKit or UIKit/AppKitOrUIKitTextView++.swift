@@ -220,8 +220,8 @@ extension AppKitOrUIKitTextView {
         return paragraphStyle
     }
     
-    func _sizeThatFits(
-        width: CGFloat
+    func _sizeThatFitsWidth(
+        _ width: CGFloat
     ) -> CGSize? {
         _sizeThatFitsWithoutCopying(width: width)
     }
@@ -229,10 +229,14 @@ extension AppKitOrUIKitTextView {
     private func _sizeThatFitsWithoutCopying(
         width: CGFloat
     ) -> CGSize? {
-        guard let textContainer = _SwiftUIX_textContainer, let layoutManager = _SwiftUIX_layoutManager, let textStorage = _SwiftUIX_textStorage else {
+        guard
+            let textContainer = _SwiftUIX_textContainer,
+            let layoutManager = _SwiftUIX_layoutManager,
+            let textStorage = _SwiftUIX_textStorage
+        else {
             return nil
         }
-        
+
         let originalSize = frame.size
         let originalTextContainerSize = textContainer.containerSize
         

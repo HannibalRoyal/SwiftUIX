@@ -7,10 +7,11 @@ import SwiftUI
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
 /// An enumeration that represents either a screen or a SwiftUI `CoordinateSpace`.
-public enum _ScreenOrCoordinateSpace: Hashable {
+@_documentation(visibility: internal)
+public enum _ScreenOrCoordinateSpace: Hashable, @unchecked Sendable {
     case cocoa(Screen?)
     case coordinateSpace(CoordinateSpace)
-        
+    
     public var _cocoaScreen: Screen? {
         guard case .cocoa(let screen) = self else {
             return nil

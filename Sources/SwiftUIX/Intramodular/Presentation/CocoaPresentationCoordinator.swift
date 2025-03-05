@@ -7,7 +7,7 @@ import Swift
 import SwiftUI
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
-
+@_documentation(visibility: internal)
 @objc public class CocoaPresentationCoordinator: NSObject, ObservableObject {
     /// The active modal presentation represented by the corresponding view controller.
     ///
@@ -324,7 +324,7 @@ extension CocoaPresentationCoordinator: UIPopoverPresentationControllerDelegate 
 #endif
 
 struct _UseCocoaPresentationCoordinator: ViewModifier {
-    @ObservedObject var presentationCoordinatorBox: _SwiftUIX_ObservableWeakReferenceBox<CocoaPresentationCoordinator>
+    @State var presentationCoordinatorBox: _SwiftUIX_ObservableWeakReferenceBox<CocoaPresentationCoordinator>
     
     private var coordinator: CocoaPresentationCoordinator? {
         presentationCoordinatorBox.value

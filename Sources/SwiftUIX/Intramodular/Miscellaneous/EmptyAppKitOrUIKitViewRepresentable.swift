@@ -4,6 +4,7 @@
 
 import SwiftUI
 
+@_documentation(visibility: internal)
 public struct EmptyAppKitOrUIKitViewRepresentable: View {
     private let update: (any _AppKitOrUIKitViewRepresentableContext) -> Void
     private let dismantle: () -> Void
@@ -54,13 +55,13 @@ extension EmptyAppKitOrUIKitViewRepresentable {
         }
         
         /*public static func dismantleAppKitOrUIKitView(
-            _ view: Self,
-            coordinator: Coordinator
-        ) {
-            DispatchQueue.main.async {
-                view.dismantle()
-            }
-        }*/
+         _ view: Self,
+         coordinator: Coordinator
+         ) {
+         DispatchQueue.main.async {
+         view.dismantle()
+         }
+         }*/
     }
 }
 #elseif os(watchOS)

@@ -10,8 +10,10 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, *)
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
+@_documentation(visibility: internal)
 public struct EditableText: View {
-    public enum Activation {
+    @_documentation(visibility: internal)
+public enum Activation {
         case onDoubleTap
     }
     
@@ -130,6 +132,7 @@ public struct EditableText: View {
     }
     
     @available(macOS, unavailable)
+    @MainActor
     @ViewBuilder
     private func editModeRespectingContent(editMode: Binding<EditMode>) -> some View {
         Group {
@@ -164,6 +167,7 @@ public struct EditableText: View {
     }
     
     @ViewBuilder
+    @MainActor
     private func nonEditModeContent() -> some View {
         if !isEditing {
             staticDisplay
@@ -199,6 +203,7 @@ public struct EditableText: View {
         }
     }
 
+    @MainActor
     @ViewBuilder
     private var editableDisplay: some View {
         Group {

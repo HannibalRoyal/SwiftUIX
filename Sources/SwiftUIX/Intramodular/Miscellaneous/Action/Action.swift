@@ -6,7 +6,8 @@ import Swift
 import SwiftUI
 
 /// A convenience around a closure of the type `() -> Void`.
-public struct Action: DynamicAction, Hashable, Identifiable {
+@_documentation(visibility: internal)
+public struct Action: DynamicAction, Hashable, Identifiable, @unchecked Sendable {
     public let id: AnyHashable?
     
     private let fakeID: AnyHashable?
@@ -98,6 +99,7 @@ extension Action {
     }
 }
 
+@_documentation(visibility: internal)
 public struct PerformAction: _ActionPerformingView {
     private let action: Action
     private let deferred: Bool
@@ -175,6 +177,7 @@ struct _CreateActionTrampoline<Content: View>: View {
 }
 
 @_spi(Internal)
+@_documentation(visibility: internal)
 public struct _CreateActionTrampolines<Key: Hashable, Content: View>: View {
     private class ActionTrampoline {
         var base: Action

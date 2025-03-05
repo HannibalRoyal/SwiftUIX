@@ -15,6 +15,7 @@ import UIKit
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
 /// A representation of the device's screen.
+@_documentation(visibility: internal)
 public class Screen: ObservableObject {
     public static let main = Screen()
     
@@ -55,6 +56,10 @@ public class Screen: ObservableObject {
     }
     
     var orientationObserver: NSObjectProtocol?
+        
+    #if  os(iOS) || os(macOS) || os(tvOS)
+    var appKitOrUIKitScreen: AppKitOrUIKitScreen?
+    #endif
     
     private init() {
         #if os(iOS)
@@ -63,9 +68,13 @@ public class Screen: ObservableObject {
             object: nil,
             queue: .main,
             using: { [weak self] notification in
-                self?.objectWillChange.send()
+                self?._objectWillChange_send()
             }
         )
+        #endif
+        
+        #if  os(iOS) || os(macOS) || os(tvOS)
+        self.appKitOrUIKitScreen = nil
         #endif
     }
     
@@ -74,10 +83,14 @@ public class Screen: ObservableObject {
     }
 }
 
-#if os(macOS)
+#if  os(iOS) || os(macOS) || os(tvOS)
 extension Screen {
-    public convenience init(_ screen: NSScreen?) {
-        self.init() // FIXME: currently defaults to NSScreen.main
+    public convenience init(_ screen: AppKitOrUIKitScreen?) {
+        self.init()
+        
+        #if os(macOS)
+        self.appKitOrUIKitScreen = screen
+        #endif
     }
 }
 #endif
@@ -122,11 +135,19 @@ extension Screen {
 
 extension Screen: Hashable {
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self))
+        #if os(iOS) || os(macOS) || os(tvOS)
+        if let appKitOrUIKitScreen {
+            hasher.combine(ObjectIdentifier(appKitOrUIKitScreen))
+        } else {
+            hasher.combine(ObjectIdentifier((AppKitOrUIKitScreen.main as Optional<AppKitOrUIKitScreen>)!)) // FIXME: !!!
+        }
+        #else
+        hasher.combine(ObjectIdentifier(self)) // FIXME: !!!
+        #endif
     }
     
     public static func == (lhs: Screen, rhs: Screen) -> Bool {
-        true // FIXME
+        lhs.hashValue == rhs.hashValue
     }
 }
 

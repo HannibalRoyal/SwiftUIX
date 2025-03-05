@@ -4,6 +4,7 @@
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
+import _SwiftUIX
 import Combine
 import Swift
 import SwiftUI
@@ -38,11 +39,13 @@ public protocol _PlatformTextViewType: _AppKitOrUIKitRepresented, AppKitOrUIKitT
     
     func invalidateLayout(for range: NSRange)
     func invalidateDisplay(for range: NSRange)
+   
     func _ensureLayoutForTextContainer()
 }
 
 /// The main `UITextView` subclass used by `TextView`.
 @available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
+@_documentation(visibility: internal)
 open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
     public var representatableStateFlags: _AppKitOrUIKitRepresentableStateFlags = []
     public var representableCache: _AppKitOrUIKitRepresentableCache = nil
@@ -74,6 +77,10 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     private var _lazyTextEditorEventPublisher: AnyPublisher<_SwiftUIX_TextEditorEvent, Never>? = nil
     
     private var _lazy_observableTextCursor: _ObservableTextCursor? = nil
+    
+    open var _providesCustomSetDataValueMethod: Bool {
+        false
+    }
     
     @_spi(Internal)
     public var _textEditorEventPublisher: AnyPublisher<_SwiftUIX_TextEditorEvent, Never> {
@@ -219,7 +226,7 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     
     override open var intrinsicContentSize: CGSize {
         if let _fixedSize = configuration._fixedSize {
-            if _fixedSize == (false, false) {
+            if _fixedSize.value == (false, false) {
                 return CGSize(width: AppKitOrUIKitView.noIntrinsicMetric, height: AppKitOrUIKitView.noIntrinsicMetric)
             }
         }
@@ -239,7 +246,7 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     
     var _SwiftUIX_intrinsicContentSizeIsDisabled: Bool {
         if let _fixedSize = configuration._fixedSize {
-            if _fixedSize == (false, false) {
+            if _fixedSize.value == (false, false) {
                 return true
             }
         }
@@ -294,7 +301,7 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         context: some _AppKitOrUIKitViewRepresentableContext
     ) {
         if #available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *) {
-            self._textEditorProxyBase = context.environment._textViewProxy?.wrappedValue._base
+            self._textEditorProxyBase = context.environment._textViewProxyBinding.wrappedValue?.wrappedValue._base
         } 
         
         _PlatformTextView<Label>.updateAppKitOrUIKitTextView(
@@ -366,7 +373,7 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
         super.resignFirstResponder()
     }
     #endif
-    
+            
     #if os(macOS)
     open override func draggingEntered(
         _ sender: NSDraggingInfo
@@ -664,111 +671,6 @@ open class _PlatformTextView<Label: View>: AppKitOrUIKitTextView, NSLayoutManage
     }
 }
 
-@available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-extension _PlatformTextView {
-    func _sizeThatFits(
-        proposal: AppKitOrUIKitLayoutSizeProposal
-    ) -> CGSize? {
-        guard let targetWidth = proposal.replacingUnspecifiedDimensions(by: .zero).targetWidth else {
-            assertionFailure()
-            
-            return nil
-        }
-                
-        if let _fixedSize = configuration._fixedSize {
-            if _fixedSize == (false, false) {
-                return nil
-            }
-        }
-        
-        if let cached = representableCache.sizeThatFits(proposal: proposal) {
-            return cached
-        } else {
-            assert(proposal.size.maximum == nil)
-            
-            let _sizeThatFits: CGSize? = _uncachedSizeThatFits(for: targetWidth)
-            
-            guard var result: CGSize = _sizeThatFits else {
-                return nil
-            }
-            
-            if !result._hasPlaceholderDimension(.width, for: .textContainer) {
-                var _result = result._filterPlaceholderDimensions(for: .textContainer)
-                
-                if let _fixedSize = configuration._fixedSize {
-                    switch _fixedSize {
-                        case (false, false):
-                            if (_result.width ?? 0) < targetWidth {
-                                _result.width = targetWidth
-                            }
-                            
-                            if let targetHeight = proposal.targetHeight, (_result.height ?? 0) < targetHeight {
-                                _result.height = targetHeight
-                            }
-                        case (false, true):
-                            if (_result.width ?? 0) < targetWidth {
-                                if _numberOfLinesOfWrappedTextDisplayed > 1 {
-                                    _result.width = targetWidth
-                                }
-                            }
-                            
-                            if let targetHeight = proposal.targetHeight, (_result.height ?? 0) < targetHeight {
-                                _result.height = targetHeight
-                            }
-                        default:
-                            assertionFailure()
-                            
-                            break
-                    }
-                } else {
-                    _result.width = max(result.width, targetWidth)
-                }
-                
-                guard let _result = CGSize(_result) else {
-                    return nil
-                }
-                                                
-                result = _result
-            } else {
-                guard !targetWidth.isPlaceholderDimension(for: .textContainer) else {
-                    return nil
-                }
-                
-                result.width = targetWidth
-            }
-             
-            representableCache._sizeThatFitsCache[proposal] = result
-
-            return result
-        }
-    }
-    
-    private func _uncachedSizeThatFits(
-        for width: CGFloat
-    ) -> CGSize? {
-        guard let textContainer = _SwiftUIX_textContainer, let layoutManager = _SwiftUIX_layoutManager else {
-            return nil
-        }
-        
-        if
-            !representableCache._sizeThatFitsCache.isEmpty,
-            textContainer.containerSize.width == width,
-            textContainer._hasNormalContainerWidth
-        {
-            let usedRect = layoutManager.usedRect(for: textContainer).size
-
-            /// DO NOT REMOVE.
-            if usedRect.isAreaZero {
-                return _sizeThatFits(width: width)
-            }
-            
-            return usedRect
-        } else {
-            return _sizeThatFits(width: width)
-        }
-    }
-}
-
 // MARK: - Conformances
 
 @_spi(Internal)
@@ -780,18 +682,6 @@ extension _PlatformTextView: _PlatformTextViewType {
                 self._lazyTextEditorEventSubject?.send(event)
             }
         }
-    }
-}
-
-// MARK: - Helpers
-
-extension NSAttributedString {
-    var _isSingleTextAttachment: Bool {
-        guard length == 1, self.string.first! == Character(UnicodeScalar(NSTextAttachment.character)!) else {
-            return false
-        }
-        
-        return true
     }
 }
 

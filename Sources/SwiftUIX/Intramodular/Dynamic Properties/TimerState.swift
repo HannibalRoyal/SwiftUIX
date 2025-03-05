@@ -2,6 +2,7 @@
 // Copyright (c) Vatsal Manot
 //
 
+import _SwiftUIX
 import Combine
 import Dispatch
 import Swift
@@ -10,11 +11,12 @@ import SwiftUI
 /// A property wrapper type that can maintain a timed counter.
 @available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 @propertyWrapper
+@_documentation(visibility: internal)
 public struct TimerState: DynamicProperty {
     private class ValueBox: ObservableObject {
         var value: Int {
             willSet {
-                objectWillChange.send()
+                _objectWillChange_send()
             }
         }
         

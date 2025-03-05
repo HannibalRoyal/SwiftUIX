@@ -104,12 +104,14 @@ fileprivate struct _ZeroSizeView: AppKitOrUIKitViewRepresentable {
 }
 
 @frozen
+@_documentation(visibility: internal)
 public struct ZeroSizeView: View {
     public var body: some View {
         _ZeroSizeView()
             .frame(width: 0, height: 0)
-            .accessibility(hidden: true)
+            .clipped()
             .allowsHitTesting(false)
+            .accessibility(hidden: true)
     }
     
     public init() {
@@ -121,6 +123,7 @@ public struct ZeroSizeView: View {
 
 /// A zero-size view for when `EmptyView` just doesn't work.
 @frozen
+@_documentation(visibility: internal)
 public struct ZeroSizeView: View {
     public var body: some View {
         Color.almostClear

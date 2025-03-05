@@ -6,6 +6,7 @@
 
 import Combine
 import Swift
+import SwiftUI
 @_spi(Internal) import _SwiftUIX
 
 @available(*, deprecated, renamed: "_ObservableTextCursor")
@@ -48,6 +49,7 @@ extension _ObservableTextCursor {
     }
 }
 
+@_documentation(visibility: internal)
 public final class _ObservableTextCursor: ObservableObject {
     private weak var owner: (any _PlatformTextViewType)?
     

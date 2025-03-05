@@ -8,6 +8,7 @@ import SwiftUI
 /// A `Binding` that only allows the _setting_ of values.
 @frozen
 @propertyWrapper
+@_documentation(visibility: internal)
 public struct SetBinding<Value> {
     @usableFromInline
     let set: (Value) -> ()
@@ -35,7 +36,7 @@ public struct SetBinding<Value> {
     public var projectedValue: Binding<Value> {
         .init(
             get: { fatalError() },
-            set: set
+            set: { set($0) }
         )
     }
     

@@ -4,6 +4,8 @@
 
 #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
 
+import _SwiftUIX
+import Foundation
 import SwiftUI
 import UIKit
 
@@ -19,7 +21,7 @@ extension _PlatformTextView {
         view.hoverStyle = .none
         #endif
 
-        let requiresAttributedText = false
+        let requiresAttributedText: Bool = false
             || context.environment._textView_requiresAttributedText
             || configuration.requiresAttributedText
             || data.wrappedValue.isAttributed
@@ -78,7 +80,7 @@ extension _PlatformTextView {
         
         view.textContainer.lineFragmentPadding = .zero
         view.textContainer.maximumNumberOfLines = context.environment.lineLimit ?? 0
-        view.textContainerInset = configuration.textContainerInset
+        view.textContainerInset = AppKitOrUIKitEdgeInsets(configuration.textContainerInsets)
         
         if data.wrappedValue.kind != .cocoaTextStorage {
             if requiresAttributedText {
@@ -180,7 +182,7 @@ extension _PlatformTextView {
             } else if !isScrollEnabled {
                 return .init(
                     width: bounds.width,
-                    height: _sizeThatFits(width: bounds.width)?.height ?? AppKitOrUIKitView.noIntrinsicMetric
+                    height: _sizeThatFitsWidth(bounds.width)?.height ?? AppKitOrUIKitView.noIntrinsicMetric
                 )
             } else {
                 return .init(

@@ -3,11 +3,14 @@
 //
 
 import Combine
+import Foundation
 import Swift
+import SwiftUI
 
 @_spi(Internal)
+@_documentation(visibility: internal)
 public class _AnyObservableObjectMutableBox<WrappedValue>: ObservableObject {
-    public var __unsafe_opaque_base: AnyObject? {
+    public var __unsafe_opaque_base: Any? {
         get {
             fatalError()
         } set {
@@ -25,38 +28,63 @@ public class _AnyObservableObjectMutableBox<WrappedValue>: ObservableObject {
 }
 
 @_spi(Internal)
+@_documentation(visibility: internal)
 public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObservableObjectMutableBox<WrappedValue> {
     private var baseSubscription: AnyCancellable?
     
-    private var _isNotNil: (Value) -> Bool
+    private var _isNotNilImpl: (Value) -> Bool
     private var _equate: (Value?, Value?) -> Bool
     private var _getObjectWillChange: (Value) -> AnyPublisher<Void, Never>?
     private var _makeWrappedValueBinding: (_ObservableObjectMutableBox) -> Binding<WrappedValue>
     
+    private var _isFirstSet: Bool = true
+    
+    private func _isNotNil(_ value: Value?) -> Bool {
+        guard let value else {
+            return false
+        }
+        
+        return _isNotNilImpl(value)
+    }
+    
     @_spi(Private)
     public var base: Value? {
-        didSet {
+        willSet {
+            if _isFirstSet {
+                guard _isNotNil(base) else {
+                    return
+                }
+            }
+
+            _objectWillChange_send()
+        } didSet {
             if _equate(oldValue, base), baseSubscription != nil {
                 return
             }
-            
-            if oldValue != nil {
-                objectWillChange.send()
-            }
-            
+                    
             subscribe()
+            
+            _isFirstSet = false
         }
     }
     
-    override public var __unsafe_opaque_base: AnyObject? {
+    override public var __unsafe_opaque_base: Any? {
         get {
             if let base {
-                return base as AnyObject
+                return base
             } else {
                 return nil
             }
         } set {
             if let newValue {
+                if let newValue = (newValue as? _opaque_Optional) {
+                    guard newValue.isNotNil else {
+                        base = nil
+                        
+                        return
+                    }
+                }
+                
                 base = .some(newValue as! Value)
             } else {
                 base = nil
@@ -75,7 +103,7 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
     public init<T: ObservableObject>(
         base: T? = nil
     ) where Value == Optional<T>, WrappedValue == Value {
-        _isNotNil = { (object: T?) in
+        _isNotNilImpl = { (object: T?) in
             object != nil
         }
         _equate = { lhs, rhs in
@@ -109,7 +137,7 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
     public init(
         _unsafelyCastingBase base: Value? = nil
     ) where WrappedValue == Value? {
-        _isNotNil = { _ in true }
+        _isNotNilImpl = { _ in true }
         _equate = { (lhs: Value?, rhs: Value?) -> Bool in
             guard let lhs = lhs, let rhs = rhs else {
                 return lhs == nil && rhs == nil
@@ -149,7 +177,7 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
     public init(
         base: Value? = nil
     ) where Value: ObservableObject, WrappedValue == Value? {
-        _isNotNil = { _ in true }
+        _isNotNilImpl = { _ in true }
         _equate = { $0 === $1 }
         _getObjectWillChange = {
             $0.objectWillChange.map({ _ in () }).eraseToAnyPublisher()
@@ -175,7 +203,7 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
     public init(
         makeBase: @escaping () -> Value 
     ) where Value: ObservableObject, WrappedValue == Value {
-        _isNotNil = { _ in true }
+        _isNotNilImpl = { _ in true }
         _equate = { $0 === $1 }
         _getObjectWillChange = { $0.objectWillChange.map({ _ in () }).eraseToAnyPublisher() }
         _makeWrappedValueBinding = { box in
@@ -210,7 +238,7 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
         base: Value? = nil,
         wrappedValue: @escaping (inout Value?) -> Binding<WrappedValue>
     ) where Value: ObservableObject {
-        _isNotNil = { _ in true }
+        _isNotNilImpl = { _ in true }
         _equate = { $0 === $1 }
         _getObjectWillChange = { $0.objectWillChange.map({ _ in () }).eraseToAnyPublisher() }
         _makeWrappedValueBinding = { box in
@@ -251,7 +279,7 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
                     return
                 }
                 
-                `self`.objectWillChange.send()
+                `self`._objectWillChange_send()
             })
     }
 }
@@ -259,5 +287,15 @@ public final class _ObservableObjectMutableBox<Value, WrappedValue>: _AnyObserva
 extension ObservableObject {
     fileprivate var _SwiftUIX_opaque_objectWillChange: AnyPublisher<Void, Never> {
         objectWillChange.map({ _ in () }).eraseToAnyPublisher()
+    }
+}
+
+private protocol _opaque_Optional {
+    var isNotNil: Bool { get }
+}
+
+extension Optional: _opaque_Optional {
+    fileprivate var isNotNil: Bool {
+        self != nil
     }
 }

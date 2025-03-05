@@ -71,6 +71,7 @@ public protocol AppKitOrUIKitViewRepresentable: _AppKitOrUIKitRepresentable, NSV
     @MainActor
     func updateAppKitOrUIKitView(_ view: AppKitOrUIKitViewType, context: Context)
     
+    @MainActor
     static func dismantleAppKitOrUIKitView(_ view: AppKitOrUIKitViewType, coordinator: Coordinator)
     
     @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
@@ -315,13 +316,23 @@ extension AppKitOrUIKitViewRepresentable {
         nsView: AppKitOrUIKitViewType,
         context: Context
     ) -> CGSize? {
-        self.sizeThatFits(proposal, view: nsView, context: context)
+        let represented = nsView as? _AppKitOrUIKitRepresented
+        
+        represented?.representatableStateFlags.insert(.sizingInProgress)
+
+        let result: CGSize? = self.sizeThatFits(proposal, view: nsView, context: context)
+        
+        represented?.representatableStateFlags.remove(.sizingInProgress)
+        
+        return result
     }
 }
 
 extension AppKitOrUIKitViewRepresentable {
     @MainActor
-    public func makeNSView(context: Context) -> AppKitOrUIKitViewType {
+    public func makeNSView(
+        context: Context
+    ) -> AppKitOrUIKitViewType {
         makeAppKitOrUIKitView(context: context)
     }
     
@@ -500,6 +511,7 @@ extension AppKitOrUIKitViewControllerRepresentable {
 
 // MARK: - Auxiliary
 
+@_documentation(visibility: internal)
 public struct _SwiftUIX_EditableAppKitOrUIKitViewRepresentableContext: _AppKitOrUIKitViewRepresentableContext {
     public var coordinator: Void = ()
     public var transaction: Transaction

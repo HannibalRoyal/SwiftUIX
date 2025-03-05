@@ -9,6 +9,7 @@ import SwiftUI
 @available(iOS 14.0, macOS 11.0, *)
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
+@_documentation(visibility: internal)
 public struct _SwiftUIX_KeyPress: Hashable, Sendable {
     public let phase: Phases
     public let key: KeyEquivalent
@@ -56,6 +57,7 @@ extension _SwiftUIX_KeyPress {
         public static let all: Self = [.down, .repeat, .up]
     }
     
+    @_documentation(visibility: internal)
     public enum Result: Hashable, Sendable {
         /// The action consumed the event, preventing dispatch from continuing.
         case handled
@@ -83,9 +85,10 @@ extension View {
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
 extension View {
+    @MainActor
     public func _SwiftUIX_onKeyPress(
         phases: _SwiftUIX_KeyPress.Phases = [.down, .repeat],
-        action: @escaping (_SwiftUIX_KeyPress) -> _SwiftUIX_KeyPress.Result
+        action: @escaping @MainActor (_SwiftUIX_KeyPress) -> _SwiftUIX_KeyPress.Result
     ) -> some View {
         self.onAppKitEvent(matching: .init(from: phases)) { (event: NSEvent) -> NSEvent? in
             guard let keyPress = _SwiftUIX_KeyPress(from: event) else {
@@ -109,6 +112,7 @@ extension View {
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
 extension View {
+    @MainActor
     public func _SwiftUIX_onKeyPress(
         _ key: KeyEquivalent,
         action: @escaping () -> _SwiftUIX_KeyPress.Result
@@ -124,6 +128,7 @@ extension View {
         }
     }
     
+    @MainActor
     public func _SwiftUIX_onKeyPress(
         _ key: KeyEquivalent,
         modifiers: EventModifiers,
@@ -149,8 +154,9 @@ extension View {
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
 extension View {
+    @MainActor
     public func _overrideOnMoveCommand(
-        perform action: ((_SwiftUIX_MoveCommandDirection) -> _SwiftUIX_KeyPress.Result)?
+        perform action: (@MainActor (_SwiftUIX_MoveCommandDirection) -> _SwiftUIX_KeyPress.Result)?
     ) -> some View {
         _SwiftUIX_onKeyPress { keyPress in
             guard let action else {
@@ -164,9 +170,10 @@ extension View {
             return action(command)
         }
     }
-    
+
+    @MainActor
     public func _overrideOnExitCommand(
-        perform action: (() -> _SwiftUIX_KeyPress.Result)?
+        perform action: (@MainActor () -> _SwiftUIX_KeyPress.Result)?
     ) -> some View {
         _SwiftUIX_onKeyPress { keyPress in
             guard let action else {
@@ -181,8 +188,9 @@ extension View {
         }
     }
     
+    @MainActor
     public func _overrideOnExitCommand(
-        perform action: (() -> Void)?
+        perform action: (@MainActor () -> Void)?
     ) -> some View {
         _overrideOnExitCommand { () -> _SwiftUIX_KeyPress.Result in
             guard let action = action else {
@@ -195,8 +203,9 @@ extension View {
         }
     }
     
+    @MainActor
     public func _overrideOnDeleteCommand(
-        perform action: (() -> _SwiftUIX_KeyPress.Result)?
+        perform action: (@MainActor () -> _SwiftUIX_KeyPress.Result)?
     ) -> some View {
         _SwiftUIX_onKeyPress { keyPress in
             guard let action else {
@@ -210,9 +219,10 @@ extension View {
             return action()
         }
     }
-    
+
+    @MainActor
     public func _overrideOnDeleteCommand(
-        perform action: (() -> Void)?
+        perform action: (@MainActor () -> Void)?
     ) -> some View {
         _overrideOnDeleteCommand { () -> _SwiftUIX_KeyPress.Result in
             guard let action = action else {

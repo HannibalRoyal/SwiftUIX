@@ -4,6 +4,7 @@
 
 #if os(macOS)
 
+import _SwiftUIX
 import AppKit
 import SwiftUI
 
@@ -37,6 +38,10 @@ extension _PlatformTextView {
         _assignIfNotEqual(true, to: \.usesAdaptiveColorMappingForDarkAppearance)
         _assignIfNotEqual(configuration.isSelectable, to: \.isSelectable)
 
+        if let automaticQuoteSubstitutionDisabled = configuration.automaticQuoteSubstitutionDisabled {
+            _assignIfNotEqual(!automaticQuoteSubstitutionDisabled, to: \.isAutomaticQuoteSubstitutionEnabled)
+        }
+        
         if let font = try? configuration.cocoaFont ?? context.environment.font?.toAppKitOrUIKitFont() {
             _assignIfNotEqual(font, to: \.self.font)
             
@@ -57,7 +62,7 @@ extension _PlatformTextView {
                 textStorage._assignIfNotEqual(foregroundColor, to: \.foregroundColor)
             }
             
-            if let typingAttribute = typingAttributes[NSAttributedString.Key.foregroundColor] as? AppKitOrUIKitColor, typingAttribute != foregroundColor {
+            if let typingAttribute: AppKitOrUIKitColor = typingAttributes[NSAttributedString.Key.foregroundColor] as? AppKitOrUIKitColor, typingAttribute != foregroundColor {
                 typingAttributes[NSAttributedString.Key.foregroundColor] = foregroundColor
                 typingAttributes[NSAttributedString.Key.paragraphStyle] = defaultParagraphStyle
             }
@@ -81,7 +86,9 @@ extension _PlatformTextView {
         if _currentTextViewData(kind: self.data.wrappedValue.kind) != data.wrappedValue {
             _needsIntrinsicContentSizeInvalidation = true
             
-            setDataValue(data.wrappedValue)
+            if !_providesCustomSetDataValueMethod {
+                setDataValue(data.wrappedValue)
+            }
         }
         
         self.data = data
@@ -106,11 +113,11 @@ extension _PlatformTextView {
         if _needsIntrinsicContentSizeInvalidation {
             invalidateIntrinsicContentSize()
             
-            if let intrinsicContentSize = _computeIntrinsicContentSize() {
+            /*if let intrinsicContentSize = _computeIntrinsicContentSize() {
                 self.representableCache._cachedIntrinsicContentSize = intrinsicContentSize
                 
                 _enforcePrecomputedIntrinsicContentSize()
-            }
+            }*/
         }
         
         if _wantsRelayout {
@@ -125,7 +132,7 @@ extension _PlatformTextView {
     
     private func _computeIntrinsicContentSize() -> CGSize? {
         if let _fixedSize = configuration._fixedSize {
-            switch _fixedSize {
+            switch _fixedSize.value {
                 case (false, false):
                     return nil
                 case (false, true):
@@ -153,6 +160,7 @@ extension _PlatformTextView {
             if let oldIntrinsicContentSize, let intrinsicContentSize {
                 if intrinsicContentSize.width == oldIntrinsicContentSize.width || intrinsicContentSize.width == frame.width {
                     representableCache._sizeThatFitsCache[.init(width: self.frame.width, height: nil)] = intrinsicContentSize
+                    representableCache._sizeThatFitsCache[.init(width: nil, height: nil)] = intrinsicContentSize
                 }
             }
         }
@@ -184,7 +192,7 @@ extension _PlatformTextView {
         }
         
         if let fixedSize = configuration._fixedSize {
-            if fixedSize == (false, false) {
+            if fixedSize.value == (false, false) {
                 if textContainer.heightTracksTextView == false {
                     textContainer.widthTracksTextView = true
                     textContainer.heightTracksTextView = true

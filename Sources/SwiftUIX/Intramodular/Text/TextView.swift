@@ -15,23 +15,24 @@ import UIKit
 
 /// A control that displays an editable text interface.
 @available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
+@_documentation(visibility: internal)
 public struct TextView<Label: View>: View {
     public typealias _Configuration = _TextViewConfiguration
     
     @Environment(\.font) private var font
     @Environment(\.preferredMaximumLayoutWidth) private var preferredMaximumLayoutWidth
     
-    fileprivate var label: Label
-    fileprivate var data: _TextViewDataBinding
-    fileprivate var configuration: _Configuration
-    fileprivate var customAppKitOrUIKitClassConfiguration = _CustomAppKitOrUIKitClassConfiguration()
+    var label: Label
+    var data: _TextViewDataBinding
+    var textViewConfiguration: _TextViewConfiguration
+    var customAppKitOrUIKitClassConfiguration = _CustomAppKitOrUIKitClassConfiguration()
     
     @State var representableUpdater = EmptyObservableObject()
     
     public var body: some View {
         ZStack(alignment: .top) {
-            if let _fixedSize = configuration._fixedSize {
-                switch _fixedSize {
+            if let _fixedSize = textViewConfiguration._fixedSize {
+                switch _fixedSize.value {
                     case (false, false):
                         XSpacer()
                     default:
@@ -42,16 +43,16 @@ public struct TextView<Label: View>: View {
             ZStack(alignment: Alignment(horizontal: .leading, vertical: .center)) {
                 if data.wrappedValue.isEmpty {
                     label
-                        .font(configuration.cocoaFont.map(Font.init) ?? font)
-                        .foregroundColor(Color(configuration.placeholderColor ?? .placeholderText))
+                        .font(textViewConfiguration.cocoaFont.map(Font.init) ?? font)
+                        .foregroundColor(Color(textViewConfiguration.placeholderColor ?? .placeholderText))
                         .animation(.none)
-                        .padding(configuration.textContainerInset.edgeInsets)
+                        .padding(textViewConfiguration.textContainerInsets)
                 }
                 
                 _TextView<Label>(
                     updater: representableUpdater,
                     data: data,
-                    configuration: configuration,
+                    textViewConfiguration: textViewConfiguration,
                     customAppKitOrUIKitClassConfiguration: customAppKitOrUIKitClassConfiguration
                 )
             }
@@ -72,7 +73,7 @@ extension TextView where Label == EmptyView {
     ) {
         self.label = EmptyView()
         self.data = data
-        self.configuration = configuration
+        self.textViewConfiguration = configuration
     }
 
     public init(
@@ -82,7 +83,7 @@ extension TextView where Label == EmptyView {
     ) {
         self.label = EmptyView()
         self.data = .string(text)
-        self.configuration = .init(
+        self.textViewConfiguration = .init(
             isConstant: false,
             onEditingChanged: onEditingChanged,
             onCommit: onCommit
@@ -121,7 +122,7 @@ extension TextView where Label == EmptyView {
                 }
             )
         )
-        self.configuration = .init(
+        self.textViewConfiguration = .init(
             isConstant: false,
             onEditingChanged: onEditingChanged,
             onCommit: onCommit
@@ -133,7 +134,7 @@ extension TextView where Label == EmptyView {
     ) {
         self.label = EmptyView()
         self.data = .string(.constant(text))
-        self.configuration = .init(
+        self.textViewConfiguration = .init(
             isConstant: true,
             onEditingChanged: { _ in },
             onCommit: { }
@@ -145,7 +146,7 @@ extension TextView where Label == EmptyView {
     ) {
         self.label = EmptyView()
         self.data = .cocoaAttributedString(.constant(text))
-        self.configuration = .init(
+        self.textViewConfiguration = .init(
             isConstant: true,
             onEditingChanged: { _ in },
             onCommit: { }
@@ -158,7 +159,7 @@ extension TextView where Label == EmptyView {
     ) {
         self.label = EmptyView()
         self.data = .attributedString(Binding<AttributedString>.constant(text))
-        self.configuration = .init(
+        self.textViewConfiguration = .init(
             isConstant: true,
             onEditingChanged: { _ in },
             onCommit: { }
@@ -177,7 +178,7 @@ extension TextView: DefaultTextInputType where Label == Text {
     ) {
         self.label = Text(title)
         self.data = .string(text)
-        self.configuration = .init(
+        self.textViewConfiguration = .init(
             isConstant: false,
             onEditingChanged: onEditingChanged,
             onCommit: onCommit
@@ -201,213 +202,7 @@ extension TextView: DefaultTextInputType where Label == Text {
 
 // MARK: - Modifiers
 
-@available(macOS 11.0, iOS 14.0, watchOS 8.0, tvOS 14.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    public func _fixedSize(horizontal: Bool, vertical: Bool) -> Self {
-        then {
-            $0.configuration._fixedSize = (horizontal, vertical)
-        }
-    }
-}
 
-@available(macOS 11.0, iOS 14.0, watchOS 8.0, tvOS 14.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    public func _customAppKitOrUIKitClass(
-        _ type: AppKitOrUIKitTextView.Type
-    ) -> Self {
-        then({ $0.customAppKitOrUIKitClassConfiguration = .init(class: type) })
-    }
-    
-    public func _customAppKitOrUIKitClass<T: AppKitOrUIKitTextView>(
-        _ type: T.Type,
-        update: @escaping _CustomAppKitOrUIKitClassConfiguration.UpdateOperation<T>
-    ) -> Self {
-        then({ $0.customAppKitOrUIKitClassConfiguration = .init(class: type, update: update) })
-    }
-
-    @_disfavoredOverload
-    public func _customAppKitOrUIKitClass<T: AppKitOrUIKitTextView>(
-        _ type: T.Type,
-        update: @escaping (T) -> Void
-    ) -> Self {
-        _customAppKitOrUIKitClass(type) { view, _ in
-            update(view)
-        }
-    }
-}
-
-@available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    public func onDeleteBackward(perform action: @escaping () -> Void) -> Self {
-        then({ $0.configuration.onDeleteBackward = action })
-    }
-}
-
-@available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    public func isInitialFirstResponder(_ isInitialFirstResponder: Bool) -> Self {
-        then({ $0.configuration.isInitialFirstResponder = isInitialFirstResponder })
-    }
-    
-    public func focused(_ isFocused: Binding<Bool>) -> Self {
-        then({ $0.configuration.isFocused = isFocused })
-    }
-}
-
-@available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
-    public func autocapitalization(
-        _ autocapitalization: UITextAutocapitalizationType
-    ) -> Self {
-        then({ $0.configuration.autocapitalization = autocapitalization })
-    }
-    #endif
-    
-    public func foregroundColor(
-        _ foregroundColor: Color
-    ) -> Self {
-        then({ $0.configuration.cocoaForegroundColor = foregroundColor.toAppKitOrUIKitColor() })
-    }
-    
-    @_disfavoredOverload
-    public func foregroundColor(
-        _ foregroundColor: AppKitOrUIKitColor
-    ) -> Self {
-        then({ $0.configuration.cocoaForegroundColor = foregroundColor })
-    }
-
-    public func placeholderColor(
-        _ foregroundColor: Color
-    ) -> Self {
-        then({ $0.configuration.placeholderColor = foregroundColor.toAppKitOrUIKitColor() })
-    }
-    
-    @_disfavoredOverload
-    public func placeholderColor(
-        _ placeholderColor: AppKitOrUIKitColor
-    ) -> Self {
-        then({ $0.configuration.placeholderColor = placeholderColor })
-    }
-        
-    public func tint(
-        _ tint: Color
-    ) -> Self {
-        then({ $0.configuration.tintColor = tint.toAppKitOrUIKitColor() })
-    }
-        
-    @_disfavoredOverload
-    public func tint(
-        _ tint: AppKitOrUIKitColor
-    ) -> Self {
-        then({ $0.configuration.tintColor = tint })
-    }
-    
-    #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
-    public func linkForegroundColor(
-        _ linkForegroundColor: Color?
-    ) -> Self {
-        then({ $0.configuration.linkForegroundColor = linkForegroundColor?.toAppKitOrUIKitColor() })
-    }
-    #endif
-    
-    public func font(
-        _ font: Font
-    ) -> Self {
-        then {
-            do {
-                $0.configuration.cocoaFont = try font.toAppKitOrUIKitFont()
-            } catch {
-                debugPrint(error)
-            }
-        }
-    }
-    
-    @_disfavoredOverload
-    public func font(
-        _ font: AppKitOrUIKitFont?
-    ) -> Self {
-        then({ $0.configuration.cocoaFont = font })
-    }
-    
-    public func kerning(
-        _ kerning: CGFloat
-    ) -> Self {
-        then({ $0.configuration.kerning = kerning })
-    }
-    
-    @_disfavoredOverload
-    public func textContainerInset(
-        _ textContainerInset: AppKitOrUIKitInsets
-    ) -> Self {
-        then({ $0.configuration.textContainerInset = textContainerInset })
-    }
-    
-    public func textContainerInset(
-        _ textContainerInset: EdgeInsets
-    ) -> Self {
-        then({ $0.configuration.textContainerInset = AppKitOrUIKitInsets(textContainerInset) })
-    }
-    
-    #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
-    public func textContentType(
-        _ textContentType: UITextContentType?
-    ) -> Self {
-        then({ $0.configuration.textContentType = textContentType })
-    }
-    #endif
-}
-
-@available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    public func editable(
-        _ editable: Bool
-    ) -> Self {
-        then({ $0.configuration.isEditable = editable })
-    }
-    
-    public func isSelectable(
-        _ isSelectable: Bool
-    ) -> Self {
-        then({ $0.configuration.isSelectable = isSelectable })
-    }
-}
-
-@available(iOS 13.0, macOS 11.0, tvOS 13.0, *)
-@available(watchOS, unavailable)
-extension TextView {
-    public func dismissKeyboardOnReturn(
-        _ dismissKeyboardOnReturn: Bool
-    ) -> Self {
-        then({ $0.configuration.dismissKeyboardOnReturn = dismissKeyboardOnReturn })
-    }
-    
-    public func enablesReturnKeyAutomatically(
-        _ enablesReturnKeyAutomatically: Bool
-    ) -> Self {
-        then({ $0.configuration.enablesReturnKeyAutomatically = enablesReturnKeyAutomatically })
-    }
-    
-    #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
-    public func keyboardType(
-        _ keyboardType: UIKeyboardType
-    ) -> Self {
-        then({ $0.configuration.keyboardType = keyboardType })
-    }
-    
-    public func returnKeyType(
-        _ returnKeyType: UIReturnKeyType
-    ) -> Self {
-        then({ $0.configuration.returnKeyType = returnKeyType })
-    }
-    #endif
-}
 
 // MARK: - Deprecated
 
@@ -418,7 +213,7 @@ extension TextView {
     public func isFirstResponder(
         _ isFirstResponder: Bool
     ) -> Self {
-        then({ $0.configuration.isFirstResponder = isFirstResponder })
+        then({ $0.textViewConfiguration.isFirstResponder = isFirstResponder })
     }
     
     @available(*, deprecated, renamed: "TextView.editable(_:)")
@@ -427,7 +222,6 @@ extension TextView {
     ) -> Self {
         self.editable(isEditable)
     }
-    
 }
 
 #endif

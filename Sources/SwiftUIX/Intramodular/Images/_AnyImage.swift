@@ -2,6 +2,10 @@
 // Copyright (c) Vatsal Manot
 //
 
+#if canImport(CoreImage)
+import CoreImage
+#endif
+import Foundation
 import Swift
 import SwiftUI
 
@@ -10,9 +14,11 @@ public typealias ImageName = _AnyImage.Name
 
 /// A portable representation of an image.
 @frozen
+@_documentation(visibility: internal)
 public struct _AnyImage: Hashable, @unchecked Sendable {
     /// Represents the name or identifier of an image.
     @frozen
+    @_documentation(visibility: internal)
     public enum Name: Hashable, @unchecked Sendable {
         /// An image resource from a bundle.
         case bundleResource(String, in: Bundle? = .main)
@@ -26,6 +32,7 @@ public struct _AnyImage: Hashable, @unchecked Sendable {
     }
     
     /// Represents the underlying image data.
+    @_documentation(visibility: internal)
     public enum Payload: Hashable {
         /// An AppKit or UIKit image.
         case appKitOrUIKitImage(AppKitOrUIKitImage)
@@ -113,19 +120,42 @@ extension _AnyImage {
 extension _AnyImage {
     /// Returns the JPEG data representation of the image.
     public var jpegData: Data? {
-        switch payload {
-            case .appKitOrUIKitImage:
-                return appKitOrUIKitImage?._SwiftUIX_jpegData
-            case .named:
-                return appKitOrUIKitImage?._SwiftUIX_jpegData
-        }
+        return appKitOrUIKitImage?._SwiftUIX_jpegData
     }
     
+    /// Returns the PNG data representation of the image.
+    public var pngData: Data? {
+        return appKitOrUIKitImage?.data(using: .png)
+    }
+        
     /// Initializes an _AnyImage from JPEG data.
     public init?(jpegData: Data) {
         self.init(AppKitOrUIKitImage(_SwiftUIX_jpegData: jpegData))
     }
+    
+    public init?(data: Data) {
+        self.init(AppKitOrUIKitImage(data: data))
+    }
+        
+    /// Initializes an _AnyImage with the given url.
+    public init?(contentsOf url: URL) {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        
+        self.init(data: data)
+    }
 }
+
+#if canImport(CoreImage)
+extension _AnyImage {
+    public var ciImage: CIImage? {
+        return appKitOrUIKitImage?._SwiftUIX_ciImage
+    }
+
+    public init(ciImage: CIImage) {
+        self.init(AppKitOrUIKitImage(ciImage: ciImage))
+    }
+}
+#endif
 
 // MARK: - Initializers
 
@@ -170,7 +200,11 @@ extension _AnyImage: Codable {
         do {
             self.init(payload: try Payload.named(Name(from: decoder)))
         } catch {
-            throw _DecodingError.unsupported
+            do {
+                self = try Self(jpegData: try Data(from: decoder)).unwrap()
+            } catch {
+                throw _DecodingError.unsupported
+            }
         }
     }
     
@@ -178,10 +212,8 @@ extension _AnyImage: Codable {
         switch payload {
             case .named(let name):
                 try name.encode(to: encoder)
-            case .appKitOrUIKitImage:
-                assertionFailure("unsupported")
-                
-                throw _EncodingError.unsupported
+            case .appKitOrUIKitImage(let image):
+                try image._SwiftUIX_jpegData.unwrap().encode(to: encoder)
         }
     }
 }
@@ -244,6 +276,17 @@ extension _AnyImage: View {
 }
 
 // MARK: - Auxiliary
+
+extension _AnyImage {
+    public enum FileType: String, Codable, Hashable, Sendable {
+        case tiff
+        case bmp
+        case gif
+        case jpeg
+        case png
+        case jpeg2000
+    }
+}
 
 #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || targetEnvironment(macCatalyst)
 extension AppKitOrUIKitImage {

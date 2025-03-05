@@ -21,8 +21,8 @@ extension UIColor {
 }
 
 extension UIEdgeInsets {
-    var edgeInsets: EdgeInsets {
-        .init(top: top, leading: left, bottom: bottom, trailing: right)
+    var _SwiftUI_edgeInsets: EdgeInsets {
+        EdgeInsets(top: top, leading: left, bottom: bottom, trailing: right)
     }
 }
 
@@ -71,9 +71,23 @@ import AppKit
 
 public typealias AppKitOrUIKitGraphicsImageRenderer = NSGraphicsImageRenderer
 
+extension NSEdgeInsets {
+    public var _SwiftUI_edgeInsets: EdgeInsets {
+        EdgeInsets(
+            top: top,
+            leading: left,
+            bottom: bottom,
+            trailing: right
+        )
+    }
+}
+
 extension NSImage.SymbolConfiguration {
     public convenience init(pointSize: CGFloat) {
-        self.init(pointSize: pointSize, weight: .regular)
+        self.init(
+            pointSize: pointSize,
+            weight: .regular
+        )
     }
 }
 extension NSSize {
@@ -94,6 +108,14 @@ extension NSWindow {
             
             if self.isVisible != isVisible {
                 self.setIsVisible(isVisible)
+                
+                if isVisible {
+                    DispatchQueue.main.async {
+                        #if os(macOS)
+                        NotificationCenter.default.post(name: NSWindow.didBecomeVisibleNotification, object: self)
+                        #endif
+                    }
+                }
             }
         }
     }
@@ -131,6 +153,16 @@ extension NSWindow {
 public let NSAlert_Type = unsafeBitCast(NSClassFromString("NSAlert"), to: NSAlertProtocol.Type.self)
 public let NSOpenPanel_Type = unsafeBitCast(NSClassFromString("NSOpenPanel"), to: NSOpenPanelProtocol.Type.self)
 
+@available(macCatalyst, unavailable)
+extension NSWindow.Level {
+    public static func + (lhs: Self, rhs: Int) -> Self {
+        Self(rawValue: lhs.rawValue + rhs)
+    }
+    
+    public static func + (lhs: Int, rhs: Self) -> Self {
+        rhs + lhs
+    }
+}
 #endif
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)

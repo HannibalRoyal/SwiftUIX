@@ -6,15 +6,16 @@ import Swift
 import SwiftUI
 
 // Type-erasing wrapper structure for mutable collections
+@_documentation(visibility: internal)
 public struct _AnyMutableCollection<Element>: MutableCollection {
     public typealias Index = _AnyMutableCollectionIndex
-
+    
     private var box: AnyCollectionBox<Element>
     
     public init<C: MutableCollection>(_ collection: C) where C.Element == Element {
         box = Box(collection)
     }
-        
+    
     public var startIndex: Index {
         box.startIndex
     }
@@ -44,6 +45,7 @@ public struct _AnyMutableCollection<Element>: MutableCollection {
     }
 }
 
+@_documentation(visibility: internal)
 public struct _AnyMutableCollectionIndex: Comparable {
     public let base: Any
     
@@ -153,14 +155,14 @@ extension Binding {
     public init<Data: MutableCollection & RandomAccessCollection>(
         _erasing data: Binding<Data>
     ) where Value == _AnyMutableRandomAccessCollection<Data.Element> {
-        var typeErasedData = _AnyMutableRandomAccessCollection(data.wrappedValue)
+        let typeErasedData = _SwiftUIX_ReferenceBox(wrappedValue: _AnyMutableRandomAccessCollection(data.wrappedValue))
         
         self.init(
             get: {
-                typeErasedData
+                typeErasedData.wrappedValue
             },
             set: { newValue in
-                typeErasedData = .init(newValue)
+                typeErasedData.wrappedValue = .init(newValue)
                 
                 data.wrappedValue = newValue.base as! Data
             }
@@ -172,25 +174,28 @@ extension Binding {
         transform: @escaping (Data.Element) -> TransformedElement,
         backTransform: @escaping (TransformedElement) -> Data.Element
     ) where Value == _AnyMutableRandomAccessCollection<TransformedElement> {
-        var transformedData: _LazyBidirectionalMapMutableRandomAccessCollection<Data, TransformedElement> = _LazyBidirectionalMapMutableRandomAccessCollection(
-            base: data.wrappedValue,
-            transform: transform,
-            backTransform: backTransform
+        let transformedData: _SwiftUIX_ReferenceBox<_LazyBidirectionalMapMutableRandomAccessCollection<Data, TransformedElement>> = .init(
+            value: _LazyBidirectionalMapMutableRandomAccessCollection(
+                base: data.wrappedValue,
+                transform: transform,
+                backTransform: backTransform
+            )
         )
         
         self.init(
             get: {
-                _AnyMutableRandomAccessCollection(transformedData)
+                _AnyMutableRandomAccessCollection(transformedData.value)
             },
             set: { (newValue: _AnyMutableRandomAccessCollection<TransformedElement>) in
-                transformedData = _LazyBidirectionalMapMutableRandomAccessCollection(
+                transformedData.value = _LazyBidirectionalMapMutableRandomAccessCollection(
                     base: (newValue.base as! _LazyBidirectionalMapMutableRandomAccessCollection<Data, TransformedElement>).base,
                     transform: transform,
                     backTransform: backTransform
                 )
                 
-                data.wrappedValue = transformedData.base
+                data.wrappedValue = transformedData.value.base
             }
         )
     }
 }
+

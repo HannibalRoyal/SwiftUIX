@@ -13,6 +13,7 @@ import UIKit
 @available(macCatalystApplicationExtension, unavailable)
 @available(iOSApplicationExtension, unavailable)
 @available(tvOSApplicationExtension, unavailable)
+@_documentation(visibility: internal)
 public final class Keyboard: ObservableObject {
     public static let main = Keyboard()
     
@@ -52,7 +53,7 @@ public final class Keyboard: ObservableObject {
         self.keyboardWillShowSubscription = notificationCenter
             .publisher(for: UIResponder.keyboardWillShowNotification)
             .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { _ in self.objectWillChange.send() })
+            .sink(receiveValue: { _ in self._objectWillChange_send() })
         
         self.keyboardDidShowSubscription = notificationCenter
             .publisher(for: UIResponder.keyboardDidShowNotification)
@@ -64,7 +65,7 @@ public final class Keyboard: ObservableObject {
         self.keyboardWillHideSubscription = notificationCenter
             .publisher(for: UIResponder.keyboardWillHideNotification)
             .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { _ in self.objectWillChange.send() })
+            .sink(receiveValue: { _ in self._objectWillChange_send() })
         
         self.keyboardDidHideSubscription = notificationCenter
             .publisher(for: UIResponder.keyboardDidHideNotification)
